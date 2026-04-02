@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState as useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -30,7 +30,7 @@ export default function Inscription() {
   const [gps, setGps] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [step] = useState(1)
+  
   const navigate = useNavigate()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,9 +87,9 @@ export default function Inscription() {
               Rejoignez DriveScore<br/><span style={{color:WAFA.or}}>en 3 étapes</span>
             </h2>
             {[
-              { num:'01', title:'Vos informations', desc:'Prénom, nom, email et téléphone', active: step===1 },
-              { num:'02', title:'Sécurité', desc:'Créez votre mot de passe', active: step===2 },
-              { num:'03', title:'Consentements', desc:'Conformité CNDP (Loi 09-08)', active: step===3 },
+              { num:'01', title:'Vos informations', desc:'Prénom, nom, email et téléphone', active: true },
+              { num:'02', title:'Sécurité', desc:'Créez votre mot de passe', active: false },
+              { num:'03', title:'Consentements', desc:'Conformité CNDP (Loi 09-08)', active: false },
             ].map((s,i) => (
               <div key={i} style={{
                 display:'flex',alignItems:'center',gap:14,
