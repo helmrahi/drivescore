@@ -30,7 +30,7 @@ export default function Inscription() {
   const [gps, setGps] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [step, setStep] = useState(1)
+  const [step] = useState(1)
   const navigate = useNavigate()
 
   async function handleSubmit(e: React.FormEvent) {
