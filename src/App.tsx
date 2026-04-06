@@ -17,8 +17,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     })
   }, [])
   if (loading) return (
-    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#F5F5F5'}}>
-      <div style={{width:40,height:40,border:'4px solid #2E7D32',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{width:40,height:40,border:'4px solid #2E7D32',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
