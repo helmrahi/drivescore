@@ -6,6 +6,7 @@ import Inscription from './pages/Inscription'
 import Dashboard from './pages/Dashboard'
 import Trajets from './pages/Trajets'
 import Telematics from './pages/Telematics'
+import ResetPassword from './pages/ResetPassword'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/trajets" element={<ProtectedRoute><Trajets /></ProtectedRoute>} />
         <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

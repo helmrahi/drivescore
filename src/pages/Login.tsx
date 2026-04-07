@@ -199,7 +199,7 @@ export default function Login() {
                   <label style={{fontSize:12,fontWeight:700,color:'#6B7280',letterSpacing:'0.5px'}}>
                     MOT DE PASSE
                   </label>
-                  <button type="button" style={{
+                  <button type="button" onClick={() => navigate("/reset-password")} style={{
                     background:'none',border:'none',
                     color:WAFA.vert,fontSize:12,fontWeight:600,cursor:'pointer'
                   }}>
