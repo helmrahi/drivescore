@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getLimiteVitesse, estEnExces, messageAlerte } from '../lib/speedLimits'
 
 const WAFA = {
   or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
@@ -32,12 +33,11 @@ function calcDistance(p1: GpsPoint, p2: GpsPoint): number {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
 
-function calcScore(events: AccelEvent[], speedMax: number): number {
+function calcScore(events: AccelEvent[], speedMax: number, exces: number): number {
   let score = 100
-  const freinages = events.filter(e => e.type === 'freinage').length
-  const accelerations = events.filter(e => e.type === 'acceleration').length
-  score -= freinages * 3
-  score -= accelerations * 2
+  score -= events.filter(e => e.type === 'freinage').length * 3
+  score -= events.filter(e => e.type === 'acceleration').length * 2
+  score -= exces * 5
   if (speedMax > 130) score -= 15
   else if (speedMax > 110) score -= 8
   else if (speedMax > 90) score -= 3
@@ -55,6 +55,9 @@ export default function Telematics() {
   const [events, setEvents] = useState<AccelEvent[]>([])
   const [score, setScore] = useState(100)
   const [saved, setSaved] = useState(false)
+  const [limiteActuelle, setLimiteActuelle] = useState<number | null>(null)
+  const [alerteVitesse, setAlerteVitesse] = useState('')
+  const [excessVitesse, setExcessVitesse] = useState(0)
 
   const gpsPoints = useRef<GpsPoint[]>([])
   const watchId = useRef<number | null>(null)
@@ -62,8 +65,8 @@ export default function Telematics() {
   const startTime = useRef<number>(0)
   const lastAccel = useRef({ x: 0, y: 0, z: 0, t: 0 })
   const accelEvents = useRef<AccelEvent[]>([])
+  const excessRef = useRef(0)
 
-  // Timer durée
   useEffect(() => {
     if (phase === 'running') {
       startTime.current = Date.now()
@@ -74,7 +77,6 @@ export default function Telematics() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [phase])
 
-  // Accéléromètre
   useEffect(() => {
     if (phase !== 'running') return
 
@@ -88,12 +90,12 @@ export default function Telematics() {
       const dy = Math.abs(accel.y - lastAccel.current.y)
       const magnitude = Math.sqrt(dx**2 + dy**2)
 
-      if (magnitude > 8) {
+      if (magnitude > 4) {
         const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
         const evt: AccelEvent = { type, magnitude, timestamp: now }
         accelEvents.current.push(evt)
         setEvents([...accelEvents.current])
-        setScore(calcScore(accelEvents.current, speedMax))
+        setScore(calcScore(accelEvents.current, speedMax, excessRef.current))
       }
 
       lastAccel.current = { x: accel.x, y: accel.y, z: accel.z, t: now }
@@ -107,31 +109,31 @@ export default function Telematics() {
     setPhase('requesting')
     setError('')
 
-    // Demande permission accéléromètre iOS
     if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
       try {
         const perm = await (DeviceMotionEvent as any).requestPermission()
         if (perm !== 'granted') {
-          setError("Permission accéléromètre refusée. Activez dans Réglages > Safari.")
+          setError("Permission accéléromètre refusée.")
           setPhase('idle')
           return
         }
       } catch {}
     }
 
-    // GPS
     if (!navigator.geolocation) {
-      setError("GPS non disponible sur ce navigateur.")
+      setError("GPS non disponible.")
       setPhase('idle')
       return
     }
 
     gpsPoints.current = []
     accelEvents.current = []
-    setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0); setEvents([])
+    excessRef.current = 0
+    setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0)
+    setEvents([]); setLimiteActuelle(null); setAlerteVitesse(''); setExcessVitesse(0)
 
     watchId.current = navigator.geolocation.watchPosition(
-      (pos) => {
+      async (pos) => {
         const point: GpsPoint = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -141,9 +143,26 @@ export default function Telematics() {
         }
 
         const speedMs = pos.coords.speed || 0
-        const speedKmh = Math.round(speedMs * 3.6)
-        setSpeedKmh(speedKmh)
-        setSpeedMax(prev => Math.max(prev, speedKmh))
+        const currentSpeedKmh = Math.round(speedMs * 3.6)
+        setSpeedKmh(currentSpeedKmh)
+        setSpeedMax(prev => Math.max(prev, currentSpeedKmh))
+
+        // Détection limite vitesse OSM
+        if (currentSpeedKmh > 5) {
+          try {
+            const limite = await getLimiteVitesse(point.lat, point.lng, currentSpeedKmh)
+            setLimiteActuelle(limite.limite)
+            if (estEnExces(currentSpeedKmh, limite.limite)) {
+              const msg = messageAlerte(currentSpeedKmh, limite.limite)
+              setAlerteVitesse(msg)
+              excessRef.current += 1
+              setExcessVitesse(excessRef.current)
+              setScore(calcScore(accelEvents.current, currentSpeedKmh, excessRef.current))
+            } else {
+              setAlerteVitesse('')
+            }
+          } catch {}
+        }
 
         if (gpsPoints.current.length > 0) {
           const last = gpsPoints.current[gpsPoints.current.length - 1]
@@ -173,8 +192,7 @@ export default function Telematics() {
   function stopTrajet() {
     if (watchId.current) navigator.geolocation.clearWatch(watchId.current)
     if (timerRef.current) clearInterval(timerRef.current)
-    const finalScore = calcScore(accelEvents.current, speedMax)
-    setScore(finalScore)
+    setScore(calcScore(accelEvents.current, speedMax, excessRef.current))
     setPhase('stopped')
   }
 
@@ -184,16 +202,18 @@ export default function Telematics() {
     if (!user) { navigate('/login'); return }
     const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
     if (profile) {
+      const finalScore = calcScore(accelEvents.current, speedMax, excessRef.current)
       await supabase.from('trajets').insert({
         pseudo_id: profile.pseudo_id,
-        km: km,
+        km,
         type_route: speedMax > 90 ? 'autoroute' : speedMax > 50 ? 'route' : 'ville',
         vitesse_moyenne: km > 0 && duration > 0 ? Math.round(km / duration * 3600) : 0,
         vitesse_max: speedMax,
         freinages_brusques: accelEvents.current.filter(e => e.type === 'freinage').length,
         accelerations_brusques: accelEvents.current.filter(e => e.type === 'acceleration').length,
+        exces_vitesse_count: excessRef.current,
         conduite_nocturne: new Date().getHours() >= 21 || new Date().getHours() <= 6,
-        score_trajet: score,
+        score_trajet: finalScore,
         cout_mad: +(km * 0.5).toFixed(2),
         date_trajet: new Date().toISOString().split('T')[0]
       })
@@ -211,16 +231,15 @@ export default function Telematics() {
   const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : '#EF4444'
 
   return (
-    <div style={{ minHeight:'100vh', background: WAFA.gris, fontFamily:'Inter,sans-serif' }}>
-      
-      {/* HEADER */}
+    <div style={{ minHeight:'100vh', background:WAFA.gris, fontFamily:'Inter,sans-serif' }}>
+
       <header style={{
         background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
         padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between'
       }}>
         <button onClick={() => navigate('/dashboard')}
           style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
-          ← Dashboard
+          ← Tableau de bord
         </button>
         <div style={{ textAlign:'center' }}>
           <div style={{ color:'white', fontWeight:800, fontSize:16 }}>🚗 Mode Télématique</div>
@@ -232,33 +251,32 @@ export default function Telematics() {
       <div style={{ maxWidth:480, margin:'0 auto', padding:'24px 16px' }}>
 
         {error && (
-          <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'14px 18px', borderRadius:14, marginBottom:20, fontSize:13, fontWeight:500 }}>
+          <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'14px 18px', borderRadius:14, marginBottom:20, fontSize:13 }}>
             ⚠️ {error}
           </div>
         )}
 
         {saved && (
-          <div style={{ background:'#F0FDF4', border:'1px solid #86EFAC', color:WAFA.vert, padding:'16px 18px', borderRadius:14, marginBottom:20, fontSize:14, fontWeight:700, textAlign:'center' }}>
+          <div style={{ background:'#F0FDF4', border:'1px solid #86EFAC', color:WAFA.vert, padding:'16px', borderRadius:14, marginBottom:20, fontSize:14, fontWeight:700, textAlign:'center' }}>
             ✅ Trajet sauvegardé ! Redirection...
           </div>
         )}
 
-        {/* ÉCRAN IDLE */}
+        {/* IDLE */}
         {phase === 'idle' && (
           <div style={{ textAlign:'center' }}>
             <div style={{ background:'white', borderRadius:24, padding:'48px 32px', boxShadow:'0 4px 24px rgba(0,0,0,0.08)', marginBottom:20 }}>
               <div style={{ fontSize:64, marginBottom:20 }}>🚗</div>
-              <h2 style={{ fontSize:22, fontWeight:900, color:WAFA.noir, margin:'0 0 12px' }}>
-                Télématique réelle
-              </h2>
+              <h2 style={{ fontSize:22, fontWeight:900, color:WAFA.noir, margin:'0 0 12px' }}>Télématique réelle</h2>
               <p style={{ color:'#64748B', fontSize:14, lineHeight:1.7, margin:'0 0 32px' }}>
-                Votre téléphone va détecter automatiquement votre trajet via GPS et accéléromètre. Conduisez normalement.
+                Votre téléphone détecte automatiquement votre trajet via GPS et accéléromètre.
               </p>
               <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:32, textAlign:'left' }}>
                 {[
-                  { icon:'📍', text:'GPS trace votre route en temps réel' },
+                  { icon:'📍', text:'GPS tracez votre itinéraire en temps réel' },
                   { icon:'⚡', text:'Accéléromètre détecte les freinages' },
-                  { icon:'🏎️', text:'Vitesse mesurée automatiquement' },
+                  { icon:'🏎️', text:'Vitesse réglée automatiquement' },
+                  { icon:'🚦', text:'Limite de vitesse OSM en temps réel' },
                   { icon:'📊', text:'Score calculé à la fin du trajet' },
                 ].map((f,i) => (
                   <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:WAFA.gris, borderRadius:10 }}>
@@ -275,14 +293,11 @@ export default function Telematics() {
               }}>
                 🚀 Démarrer le trajet
               </button>
-              <p style={{ fontSize:11, color:'#94A3B8', marginTop:12 }}>
-                Autorisez l'accès GPS et aux capteurs quand demandé
-              </p>
             </div>
           </div>
         )}
 
-        {/* ÉCRAN REQUESTING */}
+        {/* REQUESTING */}
         {phase === 'requesting' && (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <div style={{ fontSize:48, marginBottom:16 }}>📍</div>
@@ -291,30 +306,39 @@ export default function Telematics() {
           </div>
         )}
 
-        {/* ÉCRAN RUNNING */}
+        {/* RUNNING */}
         {phase === 'running' && (
           <div>
-            {/* Indicateur LIVE */}
-            <div style={{
-              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-              marginBottom:20, padding:'10px', background:'#FEF2F2', borderRadius:12
-            }}>
+            {/* LIVE indicator */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:16, padding:'10px', background:'#FEF2F2', borderRadius:12 }}>
               <div style={{ width:10, height:10, borderRadius:'50%', background:'#EF4444', animation:'pulse 1s infinite' }} />
               <span style={{ fontWeight:800, color:'#EF4444', fontSize:14 }}>EN COURS — {formatDuration(duration)}</span>
             </div>
 
-            {/* Vitesse GRANDE */}
+            {/* Alerte vitesse */}
+            {alerteVitesse && (
+              <div style={{ background:'#FEF2F2', border:'2px solid #EF4444', borderRadius:14, padding:'12px 16px', marginBottom:16, textAlign:'center', fontWeight:700, fontSize:14, color:'#DC2626', animation:'pulse 1s infinite' }}>
+                {alerteVitesse}
+              </div>
+            )}
+
+            {/* Vitesse + limite */}
             <div style={{
               background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-              borderRadius:24, padding:'32px', textAlign:'center', marginBottom:16,
-              position:'relative', overflow:'hidden'
+              borderRadius:24, padding:'28px', textAlign:'center', marginBottom:16
             }}>
-              <div style={{ position:'absolute', top:-30, right:-30, width:120, height:120, borderRadius:'50%', background:'rgba(245,166,35,0.1)' }} />
               <p style={{ color:'rgba(255,255,255,0.6)', fontSize:12, margin:'0 0 8px', letterSpacing:'1px' }}>VITESSE ACTUELLE</p>
-              <div style={{ fontSize:80, fontWeight:900, color:'white', lineHeight:1 }}>{speedKmh}</div>
-              <div style={{ fontSize:18, color:'rgba(255,255,255,0.7)', marginBottom:16 }}>km/h</div>
-              <div style={{ display:'inline-block', background:WAFA.or, color:WAFA.noir, padding:'6px 16px', borderRadius:20, fontSize:13, fontWeight:700 }}>
-                Max : {speedMax} km/h
+              <div style={{ fontSize:80, fontWeight:900, color: alerteVitesse ? '#EF4444' : 'white', lineHeight:1 }}>{speedKmh}</div>
+              <div style={{ fontSize:18, color:'rgba(255,255,255,0.7)', marginBottom:12 }}>km/h</div>
+              <div style={{ display:'flex', justifyContent:'center', gap:12 }}>
+                <div style={{ background:WAFA.or, color:WAFA.noir, padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:700 }}>
+                  Max : {speedMax} km/h
+                </div>
+                {limiteActuelle && (
+                  <div style={{ background: alerteVitesse ? '#EF4444' : 'rgba(255,255,255,0.2)', color:'white', padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:700, border:'2px solid white' }}>
+                    🚦 Limite : {limiteActuelle} km/h
+                  </div>
+                )}
               </div>
             </div>
 
@@ -333,31 +357,28 @@ export default function Telematics() {
             </div>
 
             {/* Incidents */}
-            <div style={{ background:'white', borderRadius:16, padding:'16px 18px', marginBottom:20, boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ background:'white', borderRadius:16, padding:'16px 18px', marginBottom:16, boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
               <div style={{ fontSize:12, fontWeight:700, color:'#94A3B8', marginBottom:12 }}>INCIDENTS DÉTECTÉS</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:'#FEF2F2', borderRadius:10 }}>
-                  <span style={{ fontSize:18 }}>🛑</span>
-                  <div>
-                    <div style={{ fontWeight:800, fontSize:16, color:'#EF4444' }}>
-                      {events.filter(e => e.type === 'freinage').length}
-                    </div>
-                    <div style={{ fontSize:11, color:'#94A3B8' }}>Freinages</div>
-                  </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 8px', background:'#FEF2F2', borderRadius:10 }}>
+                  <span style={{ fontSize:20 }}>🛑</span>
+                  <div style={{ fontWeight:800, fontSize:20, color:'#EF4444' }}>{events.filter(e => e.type === 'freinage').length}</div>
+                  <div style={{ fontSize:10, color:'#94A3B8', textAlign:'center' }}>Freinages</div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:WAFA.orLight, borderRadius:10 }}>
-                  <span style={{ fontSize:18 }}>⚡</span>
-                  <div>
-                    <div style={{ fontWeight:800, fontSize:16, color:WAFA.orDark }}>
-                      {events.filter(e => e.type === 'acceleration').length}
-                    </div>
-                    <div style={{ fontSize:11, color:'#94A3B8' }}>Accél. brusques</div>
-                  </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 8px', background:WAFA.orLight, borderRadius:10 }}>
+                  <span style={{ fontSize:20 }}>⚡</span>
+                  <div style={{ fontWeight:800, fontSize:20, color:WAFA.orDark }}>{events.filter(e => e.type === 'acceleration').length}</div>
+                  <div style={{ fontSize:10, color:'#94A3B8', textAlign:'center' }}>Accél.</div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'10px 8px', background:'#FEF2F2', borderRadius:10 }}>
+                  <span style={{ fontSize:20 }}>🚨</span>
+                  <div style={{ fontWeight:800, fontSize:20, color:'#EF4444' }}>{excessVitesse}</div>
+                  <div style={{ fontSize:10, color:'#94A3B8', textAlign:'center' }}>Excès</div>
                 </div>
               </div>
             </div>
 
-            {/* Coût estimé */}
+            {/* Coût */}
             <div style={{ background:WAFA.orLight, borderRadius:14, padding:'12px 18px', marginBottom:20, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontSize:13, color:WAFA.orDark, fontWeight:600 }}>💰 Coût estimé</span>
               <span style={{ fontSize:18, fontWeight:900, color:WAFA.orDark }}>{(km * 0.5).toFixed(2)} MAD</span>
@@ -374,15 +395,12 @@ export default function Telematics() {
           </div>
         )}
 
-        {/* ÉCRAN RÉSULTAT */}
+        {/* RÉSULTAT */}
         {phase === 'stopped' && (
           <div>
             <div style={{ background:'white', borderRadius:24, padding:32, boxShadow:'0 4px 24px rgba(0,0,0,0.08)', marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:'0 0 24px', textAlign:'center' }}>
-                🏁 Résumé du trajet
-              </h2>
+              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:'0 0 24px', textAlign:'center' }}>🏁 Résumé du trajet</h2>
 
-              {/* Score final */}
               <div style={{
                 background: score >= 80 ? `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})` : score >= 60 ? `linear-gradient(135deg,${WAFA.orDark},${WAFA.or})` : 'linear-gradient(135deg,#DC2626,#EF4444)',
                 borderRadius:20, padding:'28px', textAlign:'center', marginBottom:24
@@ -395,7 +413,6 @@ export default function Telematics() {
                 </div>
               </div>
 
-              {/* Stats */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:24 }}>
                 {[
                   { icon:'🛣️', val:`${km.toFixed(2)} km`, label:'Distance' },
@@ -403,7 +420,7 @@ export default function Telematics() {
                   { icon:'🏎️', val:`${speedMax} km/h`, label:'Vitesse max' },
                   { icon:'🛑', val:events.filter(e=>e.type==='freinage').length, label:'Freinages' },
                   { icon:'⚡', val:events.filter(e=>e.type==='acceleration').length, label:'Accél.' },
-                  { icon:'💰', val:`${(km*0.5).toFixed(2)} MAD`, label:'Coût' },
+                  { icon:'🚨', val:excessVitesse, label:'Excès' },
                 ].map((s,i) => (
                   <div key={i} style={{ background:WAFA.gris, borderRadius:12, padding:'14px 10px', textAlign:'center' }}>
                     <div style={{ fontSize:20, marginBottom:4 }}>{s.icon}</div>
@@ -413,28 +430,27 @@ export default function Telematics() {
                 ))}
               </div>
 
-              {/* Conseils */}
+              {score >= 90 && (
+                <div style={{ background:'#F0FDF4', borderRadius:12, padding:'14px 16px', marginBottom:12, fontSize:13, color:WAFA.vert }}>
+                  🏅 <strong>Excellent !</strong> Vous bénéficiez d'une réduction de -15% sur votre prime.
+                </div>
+              )}
               {events.filter(e=>e.type==='freinage').length > 2 && (
-                <div style={{ background:'#FEF2F2', borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:'#DC2626' }}>
-                  💡 <strong>Conseil :</strong> Anticipez davantage les ralentissements pour éviter les freinages brusques.
+                <div style={{ background:'#FEF2F2', borderRadius:12, padding:'14px 16px', marginBottom:12, fontSize:13, color:'#DC2626' }}>
+                  💡 <strong>Conseil :</strong> Anticipez davantage les ralentissements.
                 </div>
               )}
               {speedMax > 110 && (
-                <div style={{ background:WAFA.orLight, borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:WAFA.orDark }}>
-                  ⚠️ <strong>Vitesse :</strong> Vous avez dépassé 110 km/h. Restez dans les limites autorisées.
-                </div>
-              )}
-              {score >= 90 && (
-                <div style={{ background:'#F0FDF4', borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:WAFA.vert }}>
-                  🏅 <strong>Excellent !</strong> Vous bénéficiez d'une réduction de -15% sur votre prime ce mois.
+                <div style={{ background:WAFA.orLight, borderRadius:12, padding:'14px 16px', marginBottom:12, fontSize:13, color:WAFA.orDark }}>
+                  ⚠️ <strong>Vitesse :</strong> Vous avez dépassé 110 km/h.
                 </div>
               )}
             </div>
 
             <div style={{ display:'flex', gap:12 }}>
-              <button onClick={() => { setPhase('idle'); setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0); setEvents([]); setScore(100) }}
+              <button onClick={() => { setPhase('idle'); setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0); setEvents([]); setScore(100); setLimiteActuelle(null); setAlerteVitesse(''); setExcessVitesse(0) }}
                 style={{ flex:1, padding:'16px', borderRadius:14, border:`2px solid ${WAFA.vert}`, background:'white', color:WAFA.vert, fontWeight:700, fontSize:14, cursor:'pointer' }}>
-                🔄 Nouveau trajet
+                🔄 Nouveau
               </button>
               <button onClick={saveTrajet} style={{
                 flex:2, padding:'16px', borderRadius:14,
@@ -442,7 +458,7 @@ export default function Telematics() {
                 color:'white', border:'none', fontWeight:800, fontSize:14,
                 cursor:'pointer', boxShadow:`0 6px 20px rgba(46,125,50,0.4)`
               }}>
-                💾 Sauvegarder dans DriveScore
+                💾 Sauvegarder
               </button>
             </div>
           </div>
@@ -451,7 +467,7 @@ export default function Telematics() {
         {phase === 'saving' && (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <div style={{ fontSize:48, marginBottom:16 }}>💾</div>
-            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Sauvegarde en cours...</h2>
+            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Sauvegarde...</h2>
           </div>
         )}
       </div>
