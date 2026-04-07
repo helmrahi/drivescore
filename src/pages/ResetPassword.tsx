@@ -17,7 +17,7 @@ export default function ResetPassword() {
       redirectTo: 'https://drivescore-eight.vercel.app/reset-password',
     });
     setLoading(false);
-    if (!error) setSent(true);
+    console.log("error:", error); console.log("sent!"); if (!error) setSent(true); else alert(error.message);
   };
 
   const handleUpdatePassword = async () => {
