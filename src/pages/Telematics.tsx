@@ -203,7 +203,7 @@ export default function Telematics() {
     const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
     if (profile) {
       const finalScore = calcScore(accelEvents.current, speedMax, excessRef.current)
-      await supabase.from('trajets').insert({
+      const { error: insertError } = await supabase.from('trajets').insert({
         pseudo_id: profile.pseudo_id,
         km,
         type_route: speedMax > 90 ? 'autoroute' : speedMax > 50 ? 'route' : 'ville',
@@ -217,6 +217,11 @@ export default function Telematics() {
         cout_mad: +(km * 0.5).toFixed(2),
         date_trajet: new Date().toISOString().split('T')[0]
       })
+      if (insertError) {
+        alert('Erreur sauvegarde : ' + insertError.message)
+        setPhase('stopped')
+        return
+      }
       setSaved(true)
       setTimeout(() => navigate('/dashboard'), 2000)
     }
