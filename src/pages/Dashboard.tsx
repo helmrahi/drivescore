@@ -10,13 +10,17 @@ const WAFA = {
 
 export default function Dashboard() {
   const [prenom, setPrenom] = useState('')
-  const [score] = useState(87)
-  const [km] = useState(342)
+  const [score, setScore] = useState(0)
+  const [km, setKm] = useState(0)
+  const [trajets, setTrajets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
   const navigate = useNavigate()
 
   const estimation = Math.round(200 + km * 0.5)
-  const reduction = Math.round(estimation * 0.1)
+  const reduction = score >= 90 ? Math.round(estimation * 0.15)
+    : score >= 80 ? Math.round(estimation * 0.10)
+    : score >= 70 ? Math.round(estimation * 0.05) : 0
   const total = estimation - reduction
   const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : '#EF4444'
   const scoreBg = score >= 80 ? '#F0FDF4' : score >= 60 ? WAFA.orLight : '#FEF2F2'
@@ -29,11 +33,47 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { navigate('/login'); return }
-      supabase.from('profiles').select('prenom,nom').eq('id', data.user.id).single()
-        .then(({ data: p }) => { if (p?.prenom) setPrenom(p.prenom) })
-    })
+    async function loadData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { navigate('/login'); return }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('prenom, pseudo_id')
+          .eq('id', user.id)
+          .single()
+
+        if (profile?.prenom) setPrenom(profile.prenom)
+
+        if (profile?.pseudo_id) {
+          const now = new Date()
+          const debut = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+          const fin = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+
+          const { data: trajetsData } = await supabase
+            .from('trajets')
+            .select('*')
+            .eq('pseudo_id', profile.pseudo_id)
+            .gte('date_trajet', debut.split('T')[0])
+            .lte('date_trajet', fin.split('T')[0])
+            .order('created_at', { ascending: false })
+
+          if (trajetsData && trajetsData.length > 0) {
+            const totalKm = trajetsData.reduce((s, t) => s + (t.km || 0), 0)
+            const avgScore = Math.round(trajetsData.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajetsData.length)
+            setKm(totalKm)
+            setScore(avgScore)
+            setTrajets(trajetsData.slice(0, 5))
+          }
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
   }, [navigate])
 
   async function logout() {
@@ -41,22 +81,25 @@ export default function Dashboard() {
     navigate('/login')
   }
 
-  const TRAJETS = [
-    { date: "Aujourd'hui", km: 45, route: 'Ville', score: 92, cout: 22.5 },
-    { date: 'Hier', km: 23, route: 'Autoroute', score: 88, cout: 11.5 },
-    { date: 'Il y a 2j', km: 67, route: 'Route', score: 75, cout: 33.5 },
-  ]
-
   const BADGES = [
-    { icon: '🏅', label: 'Bon conducteur', desc: 'Score > 85', color: WAFA.vert, bg: '#F0FDF4' },
-    { icon: '🌿', label: 'Éco-driver', desc: '< 500 km/mois', color: WAFA.vert, bg: '#F0FDF4' },
-    { icon: '⭐', label: 'Zéro incident', desc: '7 jours clean', color: WAFA.orDark, bg: WAFA.orLight },
-  ]
+    score >= 85 && { icon: '🏅', label: 'Bon conducteur', desc: 'Score > 85', color: WAFA.vert, bg: '#F0FDF4' },
+    km < 500 && { icon: '🌿', label: 'Éco-driver', desc: '< 500 km/mois', color: WAFA.vert, bg: '#F0FDF4' },
+    trajets.length > 0 && trajets.every(t => t.freinages_brusques === 0) && { icon: '⭐', label: 'Zéro incident', desc: 'Aucun freinage', color: WAFA.orDark, bg: WAFA.orLight },
+  ].filter(Boolean) as any[]
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: WAFA.gris }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 40, height: 40, border: `4px solid ${WAFA.vert}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+        <p style={{ color: '#94A3B8', fontSize: 14 }}>Chargement...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif' }}>
 
-      {/* HEADER */}
       <header style={{
         background: 'white', borderBottom: `1px solid ${WAFA.grisMid}`,
         padding: isMobile ? '0 12px' : '0 32px',
@@ -105,7 +148,7 @@ export default function Dashboard() {
               Bonjour {prenom} 👋
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, margin: 0 }}>
-              Avril 2026
+              {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
             </p>
           </div>
           <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 10, padding: '8px 12px', textAlign: 'center', flexShrink: 0, marginLeft: 12 }}>
@@ -114,10 +157,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KPI CARDS — colonne sur mobile, 3 colonnes sur desktop */}
+        {/* KPI CARDS */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
 
-          {/* Score */}
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `4px solid ${scoreColor}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>SCORE CONDUITE</span>
@@ -133,7 +175,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* KM */}
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '4px solid #3B82F6' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>KM CE MOIS</span>
@@ -142,11 +183,12 @@ export default function Dashboard() {
             <div style={{ fontSize: 44, fontWeight: 900, color: '#3B82F6', lineHeight: 1, marginBottom: 4 }}>{km}</div>
             <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>kilomètres parcourus</div>
             <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>💡 {km} km ce mois</div>
+              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>
+                {trajets.length} trajet{trajets.length > 1 ? 's' : ''} ce mois
+              </div>
             </div>
           </div>
 
-          {/* Facture */}
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `4px solid ${WAFA.or}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>FACTURE ESTIMÉE</span>
@@ -155,7 +197,9 @@ export default function Dashboard() {
             <div style={{ fontSize: 44, fontWeight: 900, color: WAFA.orDark, lineHeight: 1, marginBottom: 4 }}>{total}</div>
             <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>MAD ce mois</div>
             <div style={{ background: WAFA.orLight, borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>200 + {km}×0,50 − {reduction} MAD</div>
+              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>
+                200 + {km}×0,50 − {reduction} MAD
+              </div>
             </div>
           </div>
         </div>
@@ -168,29 +212,37 @@ export default function Dashboard() {
               <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🎖️ Mes badges</h2>
               <span style={{ fontSize: 11, color: '#94A3B8', background: WAFA.gris, padding: '3px 10px', borderRadius: 20 }}>Ce mois</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {BADGES.map((b, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10 }}>
-                  <span style={{ fontSize: 20 }}>{b.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
-                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{b.desc}</div>
+            {BADGES.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: 13 }}>
+                Faites des trajets pour débloquer des badges
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {BADGES.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10 }}>
+                    <span style={{ fontSize: 20 }}>{b.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
+                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{b.desc}</div>
+                    </div>
+                    <div style={{ background: b.color, color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>Obtenu</div>
                   </div>
-                  <div style={{ background: b.color, color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>Obtenu</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>💰 Détail facture</h2>
-              <span style={{ fontSize: 11, color: WAFA.vert, background: '#F0FDF4', padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>Avril 2026</span>
+              <span style={{ fontSize: 11, color: WAFA.vert, background: '#F0FDF4', padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>
+                {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
+              </span>
             </div>
             {[
               { label: 'Abonnement de base', val: '200,00 MAD', color: WAFA.noir },
               { label: `${km} km × 0,50 MAD/km`, val: `${(km * 0.5).toFixed(2)} MAD`, color: WAFA.noir },
-              { label: `Réduction -10%`, val: `-${reduction},00 MAD`, color: WAFA.vert },
+              { label: `Réduction score (${score}/100)`, val: `-${reduction},00 MAD`, color: WAFA.vert },
             ].map((l, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${WAFA.grisMid}` }}>
                 <span style={{ fontSize: 12, color: '#64748B', flex: 1, paddingRight: 8 }}>{l.label}</span>
@@ -215,30 +267,45 @@ export default function Dashboard() {
             }}>+ Nouveau</button>
           </div>
 
-          {TRAJETS.map((t, i) => (
-            <div key={i} style={{ padding: '12px', borderRadius: 12, marginBottom: 8, background: WAFA.gris, border: `1px solid ${WAFA.grisMid}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: t.route === 'Ville' ? '#EFF6FF' : t.route === 'Autoroute' ? '#F0FDF4' : WAFA.orLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-                    {t.route === 'Ville' ? '🏙️' : t.route === 'Autoroute' ? '🚀' : '🛣️'}
+          {trajets.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px', color: '#94A3B8', fontSize: 14 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🛣️</div>
+              Aucun trajet ce mois — commencez à conduire !
+            </div>
+          ) : (
+            trajets.map((t, i) => (
+              <div key={i} style={{ padding: '12px', borderRadius: 12, marginBottom: 8, background: WAFA.gris, border: `1px solid ${WAFA.grisMid}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: t.type_route === 'ville' ? '#EFF6FF' : t.type_route === 'autoroute' ? '#F0FDF4' : WAFA.orLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                      {t.type_route === 'ville' ? '🏙️' : t.type_route === 'autoroute' ? '🚀' : '🛣️'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir }}>
+                        {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : t.date_trajet}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km · {t.type_route}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir }}>{t.date}</div>
-                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km · {t.route}</div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: t.score_trajet >= 90 ? WAFA.vert : t.score_trajet >= 75 ? WAFA.orDark : '#EF4444' }}>
+                      {t.score_trajet}/100
+                    </div>
+                    <div style={{ fontSize: 12, color: WAFA.orDark, fontWeight: 700 }}>{t.cout_mad} MAD</div>
                   </div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: t.score >= 90 ? WAFA.vert : t.score >= 75 ? WAFA.orDark : '#EF4444' }}>{t.score}/100</div>
-                  <div style={{ fontSize: 12, color: WAFA.orDark, fontWeight: 700 }}>{t.cout} MAD</div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: WAFA.orLight, borderRadius: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.orDark }}>Total</span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>{TRAJETS.reduce((s, t) => s + t.cout, 0).toFixed(1)} MAD</span>
-          </div>
+          {trajets.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: WAFA.orLight, borderRadius: 10, marginTop: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.orDark }}>Total ({trajets.length} trajets)</span>
+              <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>
+                {trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(1)} MAD
+              </span>
+            </div>
+          )}
         </div>
 
         {/* FOOTER */}
