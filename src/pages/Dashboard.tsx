@@ -85,11 +85,35 @@ export default function Dashboard() {
     await supabase.from('profiles').update({ afficher_leaderboard: val }).eq('id', user.id)
   }
 
-  const BADGES = [
-    score >= 85 && { icon: '🏅', label: 'Bon conducteur', desc: 'Score > 85', color: WAFA.vert, bg: '#F0FDF4' },
-    km < 500 && { icon: '🌿', label: 'Éco-driver', desc: '< 500 km/mois', color: WAFA.vert, bg: '#F0FDF4' },
-    trajets.length > 0 && trajets.every(t => t.freinages_brusques === 0) && { icon: '⭐', label: 'Zéro incident', desc: 'Aucun freinage', color: WAFA.orDark, bg: WAFA.orLight },
-  ].filter(Boolean) as any[]
+  const BADGES = (() => {
+    const result = []
+    const totalTrajets = trajets.length
+    const totalFreinages = trajets.reduce((s, t) => s + (t.freinages_brusques || 0), 0)
+    const avgFreinages = totalTrajets > 0 ? totalFreinages / totalTrajets : 0
+    const trajetsVille = trajets.filter(t => t.type_route === 'ville').length
+
+    if (totalTrajets >= 50) result.push({ icon: '🚗', label: 'Grand conducteur', desc: '50 trajets effectués', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+    else if (totalTrajets >= 10) result.push({ icon: '🚗', label: 'Conducteur régulier', desc: '10 trajets effectués', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+    else if (totalTrajets >= 1) result.push({ icon: '🚗', label: 'Premier trajet', desc: 'Bienvenue sur DriveScore', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+    if (score >= 95) result.push({ icon: '🏅', label: 'Conducteur élite', desc: 'Score >= 95/100', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+    else if (score >= 85) result.push({ icon: '🏅', label: 'Bon conducteur', desc: 'Score >= 85/100', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+    else if (score >= 70) result.push({ icon: '🏅', label: 'En progression', desc: 'Score >= 70/100', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+    if (km <= 100) result.push({ icon: '🌿', label: 'Eco champion', desc: '< 100 km ce mois', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+    else if (km <= 300) result.push({ icon: '🌿', label: 'Eco-driver', desc: '< 300 km ce mois', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+    else if (km <= 500) result.push({ icon: '🌿', label: 'Conducteur sobre', desc: '< 500 km ce mois', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+    if (totalTrajets >= 5 && avgFreinages === 0) result.push({ icon: '🛡️', label: 'Conduite parfaite', desc: '0 freinage sur 5 trajets', level: '🥇 Or', color: WAFA.vert, bg: '#F0FDF4' })
+    else if (avgFreinages < 2 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite douce', desc: '< 2 freinages/trajet', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+    else if (avgFreinages < 5 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite sure', desc: '< 5 freinages/trajet', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+    if (trajetsVille >= 50) result.push({ icon: '🏙️', label: 'Maitre urbain', desc: '50 trajets en ville', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+    else if (trajetsVille >= 20) result.push({ icon: '🏙️', label: 'Citadin confirme', desc: '20 trajets en ville', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+    else if (trajetsVille >= 5) result.push({ icon: '🏙️', label: 'Conducteur urbain', desc: '5 trajets en ville', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+    return result
+  })()
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: WAFA.gris }}>
@@ -228,13 +252,17 @@ export default function Dashboard() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {BADGES.map((b, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10 }}>
-                    <span style={{ fontSize: 20 }}>{b.icon}</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10, border: `1px solid ${b.color}20` }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
+                      {b.icon}
+                    </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{b.desc}</div>
+                      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>{b.desc}</div>
                     </div>
-                    <div style={{ background: b.color, color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>Obtenu</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: b.color, background: 'white', padding: '3px 8px', borderRadius: 20, border: `1px solid ${b.color}30`, whiteSpace: 'nowrap' }}>
+                      {b.level}
+                    </div>
                   </div>
                 ))}
               </div>
