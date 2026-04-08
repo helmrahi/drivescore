@@ -86,7 +86,7 @@ export async function getLimiteVitesse(
 
 // Vérifie si en excès de vitesse
 export function estEnExces(vitesseActuelle: number, limite: number): boolean {
-  return vitesseActuelle > limite + 5 // 5 km/h de tolérance
+  return vitesseActuelle > limite + 2 // 2 km/h de tolérance
 }
 
 // Message d'alerte
