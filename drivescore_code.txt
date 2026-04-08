@@ -1,0 +1,1925 @@
+=== src/App.tsx ===
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
+import Login from './pages/Login'
+import Inscription from './pages/Inscription'
+import Dashboard from './pages/Dashboard'
+import Trajets from './pages/Trajets'
+import Telematics from './pages/Telematics'
+import ResetPassword from './pages/ResetPassword'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+      setLoading(false)
+    })
+  }, [])
+  if (loading) return (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{width:40,height:40,border:'4px solid #2E7D32',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+  return user ? <>{children}</> : <Navigate to="/login" replace />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/inscription" element={<Inscription />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/trajets" element={<ProtectedRoute><Trajets /></ProtectedRoute>} />
+        <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+=== src/components/WafaLogo.tsx ===
+interface Props { size?: number; withText?: boolean }
+
+export default function WafaLogo({ size = 40, withText = true }: Props) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <img
+        src="/wafa-logo.png"
+        alt="Wafa Assurance"
+        style={{ width: size, height: size, borderRadius: size * 0.18, objectFit: 'cover' }}
+      />
+      {withText && (
+        <div>
+          <div style={{ fontWeight: 900, fontSize: size * 0.38, color: '#1A1A1A', letterSpacing: '-0.3px', lineHeight: 1 }}>
+            WAFA <span style={{ color: '#2E7D32' }}>ASSURANCE</span>
+          </div>
+          <div style={{ fontSize: size * 0.22, color: '#94A3B8', letterSpacing: '0.8px', marginTop: 1 }}>
+            DRIVESCORE PAYD
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+=== src/lib/speedLimits.ts ===
+// ============================================
+// DÉTECTION LIMITE DE VITESSE
+// OpenStreetMap + Règles intelligentes
+// ============================================
+
+export interface SpeedLimit {
+  limite: number
+  source: 'osm' | 'intelligent'
+  type_route: string
+}
+
+// Cache pour éviter trop de requêtes
+const cache = new Map<string, SpeedLimit>()
+
+// Arrondir position pour cache (100m de précision)
+function cacheKey(lat: number, lng: number): string {
+  return `${Math.round(lat * 1000) / 1000},${Math.round(lng * 1000) / 1000}`
+}
+
+// Règles intelligentes basées sur vitesse et contexte
+export function limiteIntelligente(vitesseMoyenne: number): SpeedLimit {
+  if (vitesseMoyenne < 35) return { limite: 40, source: 'intelligent', type_route: 'Zone urbaine' }
+  if (vitesseMoyenne < 55) return { limite: 50, source: 'intelligent', type_route: 'Ville' }
+  if (vitesseMoyenne < 80) return { limite: 80, source: 'intelligent', type_route: 'Route' }
+  if (vitesseMoyenne < 100) return { limite: 100, source: 'intelligent', type_route: 'Route nationale' }
+  return { limite: 120, source: 'intelligent', type_route: 'Autoroute' }
+}
+
+// Requête OpenStreetMap pour limite réelle
+export async function getLimiteOSM(lat: number, lng: number): Promise<SpeedLimit | null> {
+  const key = cacheKey(lat, lng)
+  
+  // Vérifier le cache d'abord
+  if (cache.has(key)) return cache.get(key)!
+
+  try {
+    const query = `
+      [out:json][timeout:5];
+      way(around:30,${lat},${lng})["maxspeed"];
+      out tags;
+    `
+    const response = await fetch(
+      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    
+    if (!response.ok) return null
+    
+    const data = await response.json()
+    
+    if (data.elements && data.elements.length > 0) {
+      const maxspeed = data.elements[0].tags?.maxspeed
+      if (maxspeed) {
+        const limite = parseInt(maxspeed.replace(/[^0-9]/g, ''))
+        if (!isNaN(limite) && limite > 0) {
+          const result: SpeedLimit = {
+            limite,
+            source: 'osm',
+            type_route: data.elements[0].tags?.highway || 'route'
+          }
+          cache.set(key, result)
+          return result
+        }
+      }
+    }
+  } catch {
+    // Si erreur réseau, on utilise les règles intelligentes
+  }
+  
+  return null
+}
+
+// Fonction principale — combine OSM + règles intelligentes
+export async function getLimiteVitesse(
+  lat: number,
+  lng: number,
+  vitesseMoyenne: number
+): Promise<SpeedLimit> {
+  // Essayer OSM en premier
+  const osm = await getLimiteOSM(lat, lng)
+  if (osm) return osm
+  
+  // Fallback règles intelligentes
+  return limiteIntelligente(vitesseMoyenne)
+}
+
+// Vérifie si en excès de vitesse
+export function estEnExces(vitesseActuelle: number, limite: number): boolean {
+  return vitesseActuelle > limite + 5 // 5 km/h de tolérance
+}
+
+// Message d'alerte
+export function messageAlerte(vitesseActuelle: number, limite: number): string {
+  const exces = vitesseActuelle - limite
+  if (exces > 30) return `🚨 DANGER : +${exces} km/h au-dessus de la limite !`
+  if (exces > 15) return `⚠️ Attention : +${exces} km/h au-dessus de ${limite} km/h`
+  return `📍 Limite : ${limite} km/h — Ralentissez`
+}
+=== src/lib/supabase.ts ===
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL as string
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY as string
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+=== src/main.tsx ===
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+createRoot(document.getElementById('root')!).render(
+  <StrictMode><App /></StrictMode>
+)
+=== src/pages/Dashboard.tsx ===
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const WAFA = {
+  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
+  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
+  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+}
+
+function WafaLogo({ size = 40 }: { size?: number }) {
+  return (
+    <img src="/wafa-logo.png" alt="Wafa Assurance"
+      style={{ width: size, height: size, borderRadius: size * 0.15, objectFit: 'cover' }} />
+  )
+}
+
+export default function Dashboard() {
+  const [prenom, setPrenom] = useState('')
+  const [score] = useState(87)
+  const [km] = useState(342)
+  const navigate = useNavigate()
+  const estimation = Math.round(200 + km * 0.5)
+  const reduction = Math.round(estimation * 0.1)
+  const total = estimation - reduction
+  const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : '#EF4444'
+  const scoreBg = score >= 80 ? '#F0FDF4' : score >= 60 ? WAFA.orLight : '#FEF2F2'
+  const scoreLabel = score >= 80 ? '🏅 Excellent' : score >= 60 ? '⚠️ Moyen' : '🔴 À améliorer'
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { navigate('/login'); return }
+      supabase.from('profiles').select('prenom,nom').eq('id', data.user.id).single()
+        .then(({ data: p }) => { if (p?.prenom) setPrenom(p.prenom) })
+    })
+  }, [navigate])
+
+  async function logout() {
+    await supabase.auth.signOut()
+    navigate('/login')
+  }
+
+  const TRAJETS = [
+    { date: "Aujourd'hui", km: 45, route: 'Ville', score: 92, cout: 22.5 },
+    { date: 'Hier', km: 23, route: 'Autoroute', score: 88, cout: 11.5 },
+    { date: 'Il y a 2j', km: 67, route: 'Route', score: 75, cout: 33.5 },
+  ]
+
+  const BADGES = [
+    { icon: '🏅', label: 'Bon conducteur', desc: 'Score > 85', color: WAFA.vert, bg: '#F0FDF4' },
+    { icon: '🌿', label: 'Éco-driver', desc: '< 500 km/mois', color: WAFA.vert, bg: '#F0FDF4' },
+    { icon: '⭐', label: 'Zéro incident', desc: '7 jours clean', color: WAFA.orDark, bg: WAFA.orLight },
+  ]
+
+  return (
+    <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif' }}>
+
+      {/* HEADER */}
+      <header style={{
+        background: 'white', borderBottom: `1px solid ${WAFA.grisMid}`,
+        padding: '0 32px', position: 'sticky', top: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <WafaLogo size={36} />
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 15, color: WAFA.noir, letterSpacing: '-0.3px' }}>
+              WAFA <span style={{ color: WAFA.vert }}>ASSURANCE</span>
+            </div>
+            <div style={{ fontSize: 10, color: '#94A3B8', letterSpacing: '0.8px', marginTop: -1 }}>DRIVESCORE PAYD</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={() => navigate('/trajets')} style={{
+            background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+            color: 'white', border: 'none', borderRadius: 10,
+            padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            boxShadow: `0 4px 12px rgba(46,125,50,0.3)`
+          }}>
+            + Déclarer un trajet
+          </button>
+          <button onClick={logout} style={{
+            background: 'none', border: `1.5px solid ${WAFA.grisMid}`,
+            color: '#EF4444', borderRadius: 10, padding: '8px 16px',
+            fontWeight: 600, fontSize: 13, cursor: 'pointer'
+          }}>
+            Déconnexion
+          </button>
+        </div>
+      </header>
+
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 20px' }}>
+
+        {/* GREETING */}
+        <div style={{
+          background: `linear-gradient(135deg,${WAFA.vertDark} 0%,${WAFA.vert} 100%)`,
+          borderRadius: 20, padding: '28px 32px', marginBottom: 24,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'relative', overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(245,166,35,0.1)' }} />
+          <div style={{ position: 'absolute', right: 80, bottom: -60, width: 150, height: 150, borderRadius: '50%', background: 'rgba(0,0,0,0.08)' }} />
+          <div>
+            <h1 style={{ color: 'white', fontSize: 26, fontWeight: 900, margin: '0 0 6px', letterSpacing: '-0.5px' }}>
+              Bonjour {prenom} 👋
+            </h1>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, margin: 0 }}>
+              Voici votre tableau de bord DriveScore — Avril 2026
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 12, padding: '10px 18px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', marginBottom: 2 }}>FACTURE DU MOIS</div>
+              <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>{total} MAD</div>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI CARDS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
+
+          {/* Score */}
+          <div style={{
+            background: 'white', borderRadius: 20, padding: 24,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            borderTop: `4px solid ${scoreColor}`
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.5px' }}>SCORE CONDUITE</span>
+              <span style={{ fontSize: 18 }}>📊</span>
+            </div>
+            <div style={{ fontSize: 56, fontWeight: 900, color: scoreColor, lineHeight: 1, marginBottom: 4 }}>{score}</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 14 }}>points sur 100</div>
+            <div style={{ background: WAFA.grisMid, borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 10 }}>
+              <div style={{ width: `${score}%`, height: '100%', background: `linear-gradient(90deg,${scoreColor},${WAFA.vertLight})`, borderRadius: 8, transition: 'width 1s ease' }} />
+            </div>
+            <div style={{ display: 'inline-block', padding: '5px 12px', borderRadius: 20, background: scoreBg, color: scoreColor, fontSize: 12, fontWeight: 700 }}>
+              {scoreLabel}
+            </div>
+          </div>
+
+          {/* Km */}
+          <div style={{
+            background: 'white', borderRadius: 20, padding: 24,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            borderTop: '4px solid #3B82F6'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.5px' }}>KM CE MOIS</span>
+              <span style={{ fontSize: 18 }}>🛣️</span>
+            </div>
+            <div style={{ fontSize: 56, fontWeight: 900, color: '#3B82F6', lineHeight: 1, marginBottom: 4 }}>{km}</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 16 }}>kilomètres parcourus</div>
+            <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>
+                💡 Vous avez parcouru {km} km ce mois
+              </div>
+            </div>
+          </div>
+
+          {/* Facture */}
+          <div style={{
+            background: 'white', borderRadius: 20, padding: 24,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            borderTop: `4px solid ${WAFA.or}`
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.5px' }}>FACTURE ESTIMÉE</span>
+              <span style={{ fontSize: 18 }}>💰</span>
+            </div>
+            <div style={{ fontSize: 56, fontWeight: 900, color: WAFA.orDark, lineHeight: 1, marginBottom: 4 }}>{total}</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 16 }}>MAD ce mois</div>
+            <div style={{ background: WAFA.orLight, borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>
+                200 + {km}km × 0,50 − {reduction} MAD réduction
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BADGES + DÉTAIL FACTURE */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+
+          {/* Badges */}
+          <div style={{ background: 'white', borderRadius: 20, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🎖️ Mes badges</h2>
+              <span style={{ fontSize: 11, color: '#94A3B8', background: WAFA.gris, padding: '3px 10px', borderRadius: 20 }}>Ce mois</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {BADGES.map((b, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', background: b.bg, borderRadius: 12,
+                  border: `1px solid ${b.color}20`
+                }}>
+                  <span style={{ fontSize: 22 }}>{b.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>{b.desc}</div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', background: b.color, color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+                    Obtenu
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Détail facture */}
+          <div style={{ background: 'white', borderRadius: 20, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: WAFA.noir, margin: 0 }}>💰 Détail facture</h2>
+              <span style={{ fontSize: 11, color: WAFA.vert, background: '#F0FDF4', padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>Avril 2026</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {[
+                { label: 'Abonnement mensuel de base', val: '200,00 MAD', color: WAFA.noir },
+                { label: `${km} km × 0,50 MAD/km`, val: `${(km * 0.5).toFixed(2)} MAD`, color: WAFA.noir },
+                { label: `Réduction score (${score}/100 → -10%)`, val: `-${reduction},00 MAD`, color: WAFA.vert },
+              ].map((l, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 0', borderBottom: `1px solid ${WAFA.grisMid}`
+                }}>
+                  <span style={{ fontSize: 13, color: '#64748B' }}>{l.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: l.color }}>{l.val}</span>
+                </div>
+              ))}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                marginTop: 12, padding: '14px 18px',
+                background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                borderRadius: 12
+              }}>
+                <span style={{ fontWeight: 800, color: 'white', fontSize: 14 }}>TOTAL CE MOIS</span>
+                <span style={{ fontWeight: 900, fontSize: 22, color: WAFA.or }}>{total} MAD</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* HISTORIQUE TRAJETS */}
+        <div style={{ background: 'white', borderRadius: 20, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🗺️ Derniers trajets</h2>
+            <button onClick={() => navigate('/trajets')} style={{
+              background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+              color: 'white', border: 'none', borderRadius: 10,
+              padding: '8px 16px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
+            }}>
+              + Nouveau trajet
+            </button>
+          </div>
+
+          {/* Header tableau */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 90px',
+            padding: '10px 16px', background: WAFA.gris, borderRadius: 10, marginBottom: 8
+          }}>
+            {['Trajet', 'Km', 'Type', 'Score', 'Coût'].map((h, i) => (
+              <div key={i} style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.5px' }}>{h}</div>
+            ))}
+          </div>
+
+          {TRAJETS.map((t, i) => (
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '1fr 80px 100px 80px 90px',
+              padding: '14px 16px', borderRadius: 12, marginBottom: 6,
+              background: i % 2 === 0 ? 'white' : WAFA.gris,
+              border: `1px solid ${WAFA.grisMid}`, alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: t.route === 'Ville' ? '#EFF6FF' : t.route === 'Autoroute' ? '#F0FDF4' : WAFA.orLight,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0
+                }}>
+                  {t.route === 'Ville' ? '🏙️' : t.route === 'Autoroute' ? '🚀' : '🛣️'}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir }}>{t.date}</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>Trajet enregistré</div>
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir }}>{t.km} km</div>
+              <div>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+                  background: t.route === 'Ville' ? '#EFF6FF' : t.route === 'Autoroute' ? '#F0FDF4' : WAFA.orLight,
+                  color: t.route === 'Ville' ? '#3B82F6' : t.route === 'Autoroute' ? WAFA.vert : WAFA.orDark
+                }}>
+                  {t.route}
+                </span>
+              </div>
+              <div>
+                <span style={{
+                  fontSize: 12, fontWeight: 800, padding: '4px 10px', borderRadius: 20,
+                  background: t.score >= 90 ? '#F0FDF4' : t.score >= 75 ? WAFA.orLight : '#FEF2F2',
+                  color: t.score >= 90 ? WAFA.vert : t.score >= 75 ? WAFA.orDark : '#EF4444'
+                }}>
+                  {t.score}/100
+                </span>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: WAFA.orDark }}>{t.cout} MAD</div>
+            </div>
+          ))}
+
+          {/* Total */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '14px 16px', marginTop: 8,
+            background: WAFA.orLight, borderRadius: 12, border: `1px solid ${WAFA.or}30`
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.orDark }}>
+              Total ({TRAJETS.length} trajets affichés)
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>
+              {TRAJETS.reduce((s, t) => s + t.cout, 0).toFixed(1)} MAD
+            </span>
+          </div>
+        </div>
+
+        {/* CONFORMITÉ CNDP */}
+        <div style={{
+          marginTop: 20, padding: '14px 20px',
+          background: WAFA.orLight, borderRadius: 14,
+          border: `1px solid ${WAFA.or}30`,
+          display: 'flex', alignItems: 'center', gap: 12
+        }}>
+          <WafaLogo size={28} />
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: WAFA.vertDark }}>Wafa Assurance · Agréé ACAPS</div>
+            <div style={{ fontSize: 11, color: '#94A3B8' }}>Données hébergées en Europe · Conforme CNDP (Loi 09-08) · © 2026</div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {['🔐 CNDP', '🇪🇺 Europe', '✅ ACAPS'].map((tag, i) => (
+              <span key={i} style={{ fontSize: 11, fontWeight: 600, color: WAFA.vert, background: '#F0FDF4', padding: '3px 10px', borderRadius: 20, border: `1px solid ${WAFA.vert}20` }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+=== src/pages/Inscription.tsx ===
+import { useState as useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const WAFA = {
+  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
+  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
+  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+}
+
+function WafaLogo({ size = 40 }: { size?: number }) {
+  return (
+    <img src="/wafa-logo.png" alt="Wafa Assurance"
+      style={{ width: size, height: size, borderRadius: size * 0.15, objectFit: 'cover' }} />
+  )
+}
+
+const inp = {
+  width:'100%', padding:'14px 14px 14px 44px',
+  borderRadius:12, border:`1.5px solid #E8E8E8`,
+  fontSize:14, outline:'none', boxSizing:'border-box' as const,
+  background:'#F5F5F5', fontFamily:'Inter,sans-serif',
+  color:'#1A1A1A', transition:'all 0.2s'
+}
+const inpNoIcon = { ...inp, paddingLeft:'14px' }
+
+export default function Inscription() {
+  const [form, setForm] = useState({ prenom:'', nom:'', email:'', telephone:'', password:'', confirm:'' })
+  const [cgu, setCgu] = useState(false)
+  const [gps, setGps] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  
+  const navigate = useNavigate()
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (form.password !== form.confirm) { setError('Mots de passe différents'); return }
+    if (!cgu || !gps) { setError('Veuillez accepter les consentements CNDP obligatoires'); return }
+    setLoading(true)
+    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password })
+    if (error) { setError(error.message); setLoading(false); return }
+    if (data.user) {
+      await supabase.from('profiles').upsert({
+        id: data.user.id, nom: form.nom, prenom: form.prenom,
+        telephone: form.telephone, role: 'client',
+        consentement_gps: gps, consentement_marketing: false
+      })
+      await supabase.from('consentements').insert([
+        { user_id: data.user.id, type_consentement: 'traitement_donnees', accorde: true, date_accord: new Date().toISOString() },
+        { user_id: data.user.id, type_consentement: 'geolocalisation', accorde: gps, date_accord: new Date().toISOString() }
+      ])
+      navigate('/dashboard')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{minHeight:'100vh',fontFamily:'Inter,sans-serif',display:'flex',background:WAFA.gris}}>
+      
+      {/* PANNEAU GAUCHE */}
+      <div style={{
+        flex:'0 0 46%',
+        background:`linear-gradient(160deg,${WAFA.vertDark} 0%,${WAFA.vert} 60%,${WAFA.vertLight} 100%)`,
+        display:'flex',flexDirection:'column',justifyContent:'space-between',
+        padding:'52px 56px',position:'relative',overflow:'hidden'
+      }}>
+        <div style={{position:'absolute',top:-100,right:-100,width:350,height:350,borderRadius:'50%',background:'rgba(245,166,35,0.08)'}} />
+        <div style={{position:'absolute',bottom:-80,left:-80,width:280,height:280,borderRadius:'50%',background:'rgba(0,0,0,0.06)'}} />
+
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:52}}>
+            <WafaLogo size={60} />
+            <div>
+              <div style={{color:'white',fontWeight:900,fontSize:24,letterSpacing:'-0.5px',lineHeight:1}}>
+                WAFA<span style={{color:WAFA.or}}> ASSURANCE</span>
+              </div>
+              <div style={{display:'inline-block',marginTop:6,background:WAFA.or,color:WAFA.noir,fontSize:10,fontWeight:800,letterSpacing:'1.5px',padding:'3px 10px',borderRadius:20}}>
+                DRIVESCORE PAYD
+              </div>
+            </div>
+          </div>
+
+          {/* Étapes */}
+          <div style={{marginBottom:40}}>
+            <h2 style={{color:'white',fontSize:28,fontWeight:900,marginBottom:24,letterSpacing:'-0.5px'}}>
+              Rejoignez DriveScore<br/><span style={{color:WAFA.or}}>en 3 étapes</span>
+            </h2>
+            {[
+              { num:'01', title:'Vos informations', desc:'Prénom, nom, email et téléphone', active: true },
+              { num:'02', title:'Sécurité', desc:'Créez votre mot de passe', active: false },
+              { num:'03', title:'Consentements', desc:'Conformité CNDP (Loi 09-08)', active: false },
+            ].map((s,i) => (
+              <div key={i} style={{
+                display:'flex',alignItems:'center',gap:14,
+                padding:'14px 18px',borderRadius:14,marginBottom:8,
+                background: s.active ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.05)',
+                border: s.active ? `1px solid ${WAFA.or}40` : '1px solid rgba(255,255,255,0.08)',
+                transition:'all 0.3s'
+              }}>
+                <div style={{
+                  width:36,height:36,borderRadius:10,flexShrink:0,
+                  background: s.active ? WAFA.or : 'rgba(255,255,255,0.1)',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  fontWeight:800,fontSize:13,
+                  color: s.active ? WAFA.noir : 'rgba(255,255,255,0.4)'
+                }}>{s.num}</div>
+                <div>
+                  <div style={{color: s.active ? 'white' : 'rgba(255,255,255,0.5)',fontWeight:700,fontSize:14}}>{s.title}</div>
+                  <div style={{color:'rgba(255,255,255,0.35)',fontSize:12,marginTop:1}}>{s.desc}</div>
+                </div>
+                {s.active && <div style={{marginLeft:'auto',color:WAFA.or,fontSize:16}}>→</div>}
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            background:'rgba(245,166,35,0.12)',border:`1px solid ${WAFA.or}30`,
+            borderRadius:14,padding:'16px 18px'
+          }}>
+            <div style={{color:WAFA.or,fontWeight:700,fontSize:13,marginBottom:4}}>🔐 Vos données sont protégées</div>
+            <div style={{color:'rgba(255,255,255,0.6)',fontSize:12,lineHeight:1.6}}>
+              Conforme CNDP (Loi 09-08 Maroc) · Hébergement Europe · Chiffrement AES-256
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:8,paddingTop:32}}>
+          <div style={{width:8,height:8,borderRadius:'50%',background:WAFA.or}} />
+          <span style={{color:'rgba(255,255,255,0.4)',fontSize:11}}>Wafa Assurance · Leader de l'assurance au Maroc depuis 1972</span>
+        </div>
+      </div>
+
+      {/* PANNEAU DROIT */}
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'40px 24px',background:'white',overflowY:'auto'}}>
+        <div style={{width:'100%',maxWidth:420}}>
+
+          <div style={{textAlign:'center',marginBottom:32}}>
+            <div style={{
+              display:'inline-flex',alignItems:'center',gap:10,
+              background:WAFA.orLight,border:`1.5px solid ${WAFA.or}`,
+              borderRadius:50,padding:'8px 20px',marginBottom:20
+            }}>
+              <WafaLogo size={22} />
+              <span style={{fontWeight:700,fontSize:13,color:WAFA.vertDark}}>Créer mon compte DriveScore</span>
+            </div>
+            <h2 style={{fontSize:26,fontWeight:900,color:WAFA.noir,margin:'0 0 6px',letterSpacing:'-0.5px'}}>Inscription</h2>
+            <p style={{color:'#64748B',fontSize:14,margin:0}}>Remplissez les informations ci-dessous</p>
+          </div>
+
+          <div style={{background:'white',borderRadius:24,padding:36,boxShadow:'0 8px 40px rgba(0,0,0,0.08)',border:`1px solid ${WAFA.grisMid}`}}>
+            
+            {error && (
+              <div style={{display:'flex',alignItems:'center',gap:10,background:'#FEF2F2',border:'1px solid #FECACA',color:'#DC2626',padding:'12px 16px',borderRadius:12,marginBottom:20,fontSize:13,fontWeight:500}}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:18}}>
+              
+              {/* SECTION 1 — Identité */}
+              <div style={{background:WAFA.gris,borderRadius:14,padding:'20px 18px'}}>
+                <div style={{fontSize:11,fontWeight:800,color:WAFA.vert,letterSpacing:'1px',marginBottom:16}}>01 · VOS INFORMATIONS</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                  <div>
+                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>PRÉNOM</label>
+                    <div style={{position:'relative'}}>
+                      <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>👤</span>
+                      <input required placeholder="Sara" value={form.prenom}
+                        onChange={e => setForm(f=>({...f,prenom:e.target.value}))}
+                        style={inp}
+                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                        onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>NOM</label>
+                    <input required placeholder="Alami" value={form.nom}
+                      onChange={e => setForm(f=>({...f,nom:e.target.value}))}
+                      style={inpNoIcon}
+                      onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                      onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                  </div>
+                </div>
+                <div style={{marginBottom:12}}>
+                  <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>EMAIL</label>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>✉️</span>
+                    <input type="email" required placeholder="sara.alami@email.com" value={form.email}
+                      onChange={e => setForm(f=>({...f,email:e.target.value}))}
+                      style={inp}
+                      onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                      onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>TÉLÉPHONE</label>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>📱</span>
+                    <input type="tel" placeholder="+212 6xx xxx xxx" value={form.telephone}
+                      onChange={e => setForm(f=>({...f,telephone:e.target.value}))}
+                      style={inp}
+                      onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                      onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2 — Sécurité */}
+              <div style={{background:WAFA.gris,borderRadius:14,padding:'20px 18px'}}>
+                <div style={{fontSize:11,fontWeight:800,color:WAFA.vert,letterSpacing:'1px',marginBottom:16}}>02 · SÉCURITÉ</div>
+                <div style={{marginBottom:12}}>
+                  <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>MOT DE PASSE</label>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔒</span>
+                    <input type="password" required placeholder="Minimum 6 caractères" value={form.password}
+                      onChange={e => setForm(f=>({...f,password:e.target.value}))}
+                      style={inp}
+                      onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                      onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6,letterSpacing:'0.3px'}}>CONFIRMER</label>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔒</span>
+                    <input type="password" required placeholder="••••••••" value={form.confirm}
+                      onChange={e => setForm(f=>({...f,confirm:e.target.value}))}
+                      style={{...inp, borderColor: form.confirm && form.confirm!==form.password ? '#EF4444' : WAFA.grisMid}}
+                      onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
+                      onBlur={e=>{e.target.style.borderColor=form.confirm!==form.password?'#EF4444':WAFA.grisMid;e.target.style.background=WAFA.gris}} />
+                  </div>
+                  {form.confirm && form.confirm!==form.password && (
+                    <p style={{fontSize:11,color:'#EF4444',margin:'4px 0 0'}}>⚠️ Les mots de passe ne correspondent pas</p>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 3 — Consentements CNDP */}
+              <div style={{background:WAFA.orLight,border:`1.5px solid ${WAFA.or}40`,borderRadius:14,padding:'20px 18px'}}>
+                <div style={{fontSize:11,fontWeight:800,color:WAFA.orDark,letterSpacing:'1px',marginBottom:4}}>03 · CONSENTEMENTS CNDP</div>
+                <p style={{fontSize:11,color:'#92400E',margin:'0 0 16px',lineHeight:1.5}}>
+                  Conformément à la Loi 09-08 relative à la protection des données personnelles au Maroc
+                </p>
+                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                  <label style={{display:'flex',alignItems:'flex-start',gap:12,cursor:'pointer',padding:'12px 14px',background:'white',borderRadius:10,border:`1px solid ${cgu?WAFA.vert:WAFA.grisMid}`}}>
+                    <input type="checkbox" checked={cgu} onChange={e=>setCgu(e.target.checked)}
+                      style={{marginTop:2,accentColor:WAFA.vert,width:16,height:16,flexShrink:0}} />
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:WAFA.noir,marginBottom:2}}>✅ Conditions générales et traitement des données</div>
+                      <div style={{fontSize:11,color:'#64748B',lineHeight:1.5}}>J'accepte que Wafa Assurance collecte et traite mes données personnelles dans le cadre du contrat d'assurance PAYD</div>
+                    </div>
+                  </label>
+                  <label style={{display:'flex',alignItems:'flex-start',gap:12,cursor:'pointer',padding:'12px 14px',background:'white',borderRadius:10,border:`1px solid ${gps?WAFA.vert:WAFA.grisMid}`}}>
+                    <input type="checkbox" checked={gps} onChange={e=>setGps(e.target.checked)}
+                      style={{marginTop:2,accentColor:WAFA.vert,width:16,height:16,flexShrink:0}} />
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:WAFA.noir,marginBottom:2}}>📍 Données de conduite et géolocalisation</div>
+                      <div style={{fontSize:11,color:'#64748B',lineHeight:1.5}}>J'autorise la collecte de mes données de conduite (km, comportement) pour le calcul de ma prime PAYD. Données pseudonymisées.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} style={{
+                padding:'16px',borderRadius:14,
+                background:loading?'#94A3B8':`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                color:'white',border:'none',fontWeight:800,fontSize:15,
+                cursor:loading?'not-allowed':'pointer',
+                boxShadow:loading?'none':`0 6px 20px rgba(46,125,50,0.4)`,
+                letterSpacing:'0.3px'
+              }}>
+                {loading ? '⏳ Création du compte...' : '🚀 Créer mon compte DriveScore'}
+              </button>
+            </form>
+
+            <div style={{marginTop:20,textAlign:'center',fontSize:13,color:'#64748B'}}>
+              Déjà un compte ?{' '}
+              <Link to="/login" style={{color:WAFA.vert,fontWeight:700,textDecoration:'none'}}>Se connecter →</Link>
+            </div>
+          </div>
+
+          <div style={{marginTop:20,padding:'14px 18px',background:WAFA.orLight,borderRadius:14,border:`1px solid ${WAFA.or}20`,textAlign:'center'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:4}}>
+              <WafaLogo size={14} />
+              <span style={{fontSize:11,fontWeight:700,color:WAFA.vertDark}}>Wafa Assurance · Agréé ACAPS</span>
+            </div>
+            <p style={{fontSize:11,color:'#94A3B8',margin:0}}>Hébergement Europe · Conforme CNDP · © 2026</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+=== src/pages/Login.tsx ===
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const WAFA = {
+  or: '#F5A623',
+  orDark: '#D4891A',
+  orLight: '#FDF3E0',
+  vert: '#2E7D32',
+  vertLight: '#4CAF50',
+  vertDark: '#1B5E20',
+  noir: '#1A1A1A',
+  gris: '#F5F5F5',
+  grisMid: '#E8E8E8',
+  texte: '#2C2C2C',
+}
+
+function WafaLogo({ size = 40 }: { size?: number }) {
+  return (
+    <img src="/wafa-logo.png" alt="Wafa Assurance"
+      style={{ width: size, height: size, borderRadius: size * 0.15, objectFit: 'cover' }} />
+  )
+}
+
+export default function Login() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+  const navigate = useNavigate()
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setError('Email ou mot de passe incorrect')
+    else navigate('/dashboard')
+    setLoading(false)
+  }
+
+  return (
+    <div style={{minHeight:'100vh',fontFamily:'Inter,sans-serif',display:'flex',background:WAFA.gris}}>
+
+      {/* PANNEAU GAUCHE — Branding Wafa */}
+      <div style={{
+        flex:'0 0 46%',
+        background:`linear-gradient(160deg, ${WAFA.vertDark} 0%, ${WAFA.vert} 60%, ${WAFA.vertLight} 100%)`,
+        display:'flex',flexDirection:'column',justifyContent:'space-between',
+        padding:'52px 56px',position:'relative',overflow:'hidden'
+      }}>
+        {/* Déco cercles */}
+        <div style={{position:'absolute',top:-100,right:-100,width:350,height:350,borderRadius:'50%',background:'rgba(245,166,35,0.08)'}} />
+        <div style={{position:'absolute',bottom:-80,left:-80,width:280,height:280,borderRadius:'50%',background:'rgba(0,0,0,0.06)'}} />
+        <div style={{position:'absolute',top:'35%',right:-60,width:200,height:200,borderRadius:'50%',background:'rgba(245,166,35,0.06)'}} />
+
+        {/* Logo + nom */}
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:52}}>
+            <WafaLogo size={60} />
+            <div>
+              <div style={{color:'white',fontWeight:900,fontSize:24,letterSpacing:'-0.5px',lineHeight:1}}>
+                WAFA<span style={{color:WAFA.or}}> ASSURANCE</span>
+              </div>
+              <div style={{
+                display:'inline-block',marginTop:6,
+                background:WAFA.or,color:WAFA.noir,
+                fontSize:10,fontWeight:800,letterSpacing:'1.5px',
+                padding:'3px 10px',borderRadius:20
+              }}>
+                DRIVESCORE PAYD
+              </div>
+            </div>
+          </div>
+
+          <h1 style={{
+            color:'white',fontSize:40,fontWeight:900,
+            lineHeight:1.15,marginBottom:20,letterSpacing:'-1px'
+          }}>
+            Conduisez mieux,<br/>
+            <span style={{color:WAFA.or}}>payez moins.</span>
+          </h1>
+
+          <p style={{color:'rgba(255,255,255,0.7)',fontSize:15,lineHeight:1.8,maxWidth:340,marginBottom:40}}>
+            La première assurance auto télématique au Maroc. Votre prime calculée sur vos kilomètres réels et votre comportement de conduite.
+          </p>
+
+          {/* Feature pills */}
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            {[
+              { icon:'🛣️', text:'200 MAD de base + 0,50 MAD/km seulement' },
+              { icon:'🏅', text:'Jusqu\'à -15% pour les bons conducteurs' },
+              { icon:'📊', text:'Score de conduite en temps réel' },
+              { icon:'🔐', text:'Données sécurisées · Conforme CNDP Maroc' },
+            ].map((f,i) => (
+              <div key={i} style={{
+                display:'flex',alignItems:'center',gap:12,
+                background:'rgba(255,255,255,0.08)',
+                border:'1px solid rgba(255,255,255,0.12)',
+                borderRadius:12,padding:'12px 16px'
+              }}>
+                <span style={{fontSize:18}}>{f.icon}</span>
+                <span style={{color:'rgba(255,255,255,0.85)',fontSize:13,fontWeight:500}}>{f.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{display:'flex',alignItems:'center',gap:8,paddingTop:32}}>
+          <div style={{width:8,height:8,borderRadius:'50%',background:WAFA.or}} />
+          <span style={{color:'rgba(255,255,255,0.45)',fontSize:11,letterSpacing:'0.3px'}}>
+            Wafa Assurance · Leader de l'assurance au Maroc depuis 1972
+          </span>
+        </div>
+      </div>
+
+      {/* PANNEAU DROIT — Formulaire */}
+      <div style={{
+        flex:1,display:'flex',alignItems:'center',
+        justifyContent:'center',padding:'40px 24px',
+        background:'white'
+      }}>
+        <div style={{width:'100%',maxWidth:420}}>
+
+          {/* Badge top */}
+          <div style={{textAlign:'center',marginBottom:36}}>
+            <div style={{
+              display:'inline-flex',alignItems:'center',gap:10,
+              background:WAFA.orLight,border:`1.5px solid ${WAFA.or}`,
+              borderRadius:50,padding:'8px 20px',marginBottom:24
+            }}>
+              <WafaLogo size={24} />
+              <span style={{fontWeight:700,fontSize:13,color:WAFA.vertDark}}>Espace conducteur DriveScore</span>
+            </div>
+
+            <h2 style={{
+              fontSize:28,fontWeight:900,color:WAFA.noir,
+              margin:'0 0 8px',letterSpacing:'-0.5px'
+            }}>
+              Connexion
+            </h2>
+            <p style={{color:'#64748B',fontSize:14,margin:0}}>
+              Bienvenue dans votre espace personnel
+            </p>
+          </div>
+
+          {/* Formulaire */}
+          <div style={{
+            background:'white',borderRadius:24,padding:36,
+            boxShadow:'0 8px 40px rgba(0,0,0,0.08)',
+            border:`1px solid ${WAFA.grisMid}`
+          }}>
+            {error && (
+              <div style={{
+                display:'flex',alignItems:'center',gap:10,
+                background:'#FEF2F2',border:'1px solid #FECACA',
+                color:'#DC2626',padding:'12px 16px',
+                borderRadius:12,marginBottom:24,fontSize:13,fontWeight:500
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{display:'flex',flexDirection:'column',gap:20}}>
+              {/* Email */}
+              <div>
+                <label style={{
+                  display:'block',fontSize:12,fontWeight:700,
+                  color:'#6B7280',marginBottom:8,letterSpacing:'0.5px'
+                }}>
+                  ADRESSE EMAIL
+                </label>
+                <div style={{position:'relative'}}>
+                  <span style={{
+                    position:'absolute',left:14,top:'50%',
+                    transform:'translateY(-50%)',fontSize:16,opacity:0.5
+                  }}>✉️</span>
+                  <input
+                    type="email" required placeholder="sara.alami@email.com"
+                    value={email} onChange={e => setEmail(e.target.value)}
+                    style={{
+                      width:'100%',padding:'14px 14px 14px 44px',
+                      borderRadius:12,border:`1.5px solid ${WAFA.grisMid}`,
+                      fontSize:14,outline:'none',boxSizing:'border-box',
+                      background:WAFA.gris,fontFamily:'Inter,sans-serif',
+                      color:WAFA.noir,transition:'all 0.2s'
+                    }}
+                    onFocus={e => {e.target.style.borderColor=WAFA.vert; e.target.style.background='white'}}
+                    onBlur={e => {e.target.style.borderColor=WAFA.grisMid; e.target.style.background=WAFA.gris}}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <label style={{fontSize:12,fontWeight:700,color:'#6B7280',letterSpacing:'0.5px'}}>
+                    MOT DE PASSE
+                  </label>
+                  <button type="button" onClick={() => navigate("/reset-password")} style={{
+                    background:'none',border:'none',
+                    color:WAFA.vert,fontSize:12,fontWeight:600,cursor:'pointer'
+                  }}>
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+                <div style={{position:'relative'}}>
+                  <span style={{
+                    position:'absolute',left:14,top:'50%',
+                    transform:'translateY(-50%)',fontSize:16,opacity:0.5
+                  }}>🔒</span>
+                  <input
+                    type={showPwd?'text':'password'} required placeholder="••••••••••"
+                    value={password} onChange={e => setPassword(e.target.value)}
+                    style={{
+                      width:'100%',padding:'14px 44px',
+                      borderRadius:12,border:`1.5px solid ${WAFA.grisMid}`,
+                      fontSize:14,outline:'none',boxSizing:'border-box',
+                      background:WAFA.gris,fontFamily:'Inter,sans-serif',
+                      color:WAFA.noir,transition:'all 0.2s'
+                    }}
+                    onFocus={e => {e.target.style.borderColor=WAFA.vert; e.target.style.background='white'}}
+                    onBlur={e => {e.target.style.borderColor=WAFA.grisMid; e.target.style.background=WAFA.gris}}
+                  />
+                  <button type="button" onClick={() => setShowPwd(!showPwd)}
+                    style={{
+                      position:'absolute',right:14,top:'50%',
+                      transform:'translateY(-50%)',
+                      background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:0.5
+                    }}>
+                    {showPwd?'🙈':'👁️'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bouton connexion */}
+              <button type="submit" disabled={loading} style={{
+                padding:'16px',borderRadius:14,
+                background:loading?'#94A3B8':`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                color:'white',border:'none',fontWeight:800,fontSize:15,
+                cursor:loading?'not-allowed':'pointer',
+                boxShadow:loading?'none':`0 6px 20px rgba(46,125,50,0.4)`,
+                transition:'all 0.2s',letterSpacing:'0.3px',
+                display:'flex',alignItems:'center',justifyContent:'center',gap:8
+              }}>
+                {loading ? (
+                  <>
+                    <div style={{width:18,height:18,border:'2px solid white',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}} />
+                    Connexion...
+                  </>
+                ) : '→ Se connecter'}
+              </button>
+            </form>
+
+            {/* Séparateur */}
+            <div style={{display:'flex',alignItems:'center',gap:12,margin:'24px 0'}}>
+              <div style={{flex:1,height:1,background:WAFA.grisMid}} />
+              <span style={{fontSize:12,color:'#94A3B8',fontWeight:500}}>Nouveau sur DriveScore ?</span>
+              <div style={{flex:1,height:1,background:WAFA.grisMid}} />
+            </div>
+
+            {/* Bouton inscription */}
+            <Link to="/inscription" style={{textDecoration:'none'}}>
+              <div style={{
+                padding:'15px',borderRadius:14,
+                border:`2px solid ${WAFA.or}`,
+                background:WAFA.orLight,
+                textAlign:'center',color:WAFA.vertDark,
+                fontWeight:800,fontSize:14,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',gap:8
+              }}>
+                <span>✨</span> Créer mon compte gratuitement
+              </div>
+            </Link>
+          </div>
+
+          {/* Footer légal */}
+          <div style={{
+            marginTop:24,padding:'16px 20px',
+            background:WAFA.orLight,borderRadius:14,
+            border:`1px solid ${WAFA.or}20`,
+            textAlign:'center'
+          }}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:4}}>
+              <WafaLogo size={16} />
+              <span style={{fontSize:12,fontWeight:700,color:WAFA.vertDark}}>Wafa Assurance</span>
+            </div>
+            <p style={{fontSize:11,color:'#94A3B8',margin:0,lineHeight:1.5}}>
+              Données hébergées en Europe · Conforme CNDP (Loi 09-08)<br/>
+              Agréé par l'ACAPS · © 2026 Tous droits réservés
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+=== src/pages/ResetPassword.tsx ===
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+
+export default function ResetPassword() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [step, setStep] = useState<'request' | 'update'>('request');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Détecter si on arrive avec un token de reset dans l'URL
+    const hash = window.location.hash;
+    if (hash.includes('access_token') && hash.includes('type=recovery')) {
+      setStep('update');
+    }
+  }, []);
+
+  const handleRequestReset = async () => {
+    if (!email) return;
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://drivescore-eight.vercel.app/reset-password',
+    });
+    setLoading(false);
+    if (error) alert(error.message);
+    else setSent(true);
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!password) return;
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) alert(error.message);
+    else {
+      alert('Mot de passe mis à jour !');
+      navigate('/login');
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'Inter, sans-serif' }}>
+      {/* Left panel */}
+      <div style={{
+        width: '45%', background: 'linear-gradient(135deg, #1a5c2a 0%, #2d7a3a 100%)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        padding: '60px 48px', color: 'white'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
+          <div style={{
+            width: 48, height: 48, background: '#f5a623', borderRadius: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22
+          }}>🛡️</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#f5a623' }}>WAFA ASSURANCE</div>
+            <div style={{ fontSize: 11, background: '#f5a623', color: '#1a5c2a', padding: '2px 8px', borderRadius: 4, fontWeight: 700, marginTop: 2 }}>DRIVESCORE PAYD</div>
+          </div>
+        </div>
+        <h1 style={{ fontSize: 36, fontWeight: 800, lineHeight: 1.2, marginBottom: 12 }}>
+          Conduisez mieux,<br />
+          <span style={{ color: '#f5a623' }}>payez moins.</span>
+        </h1>
+        <p style={{ fontSize: 15, opacity: 0.85, lineHeight: 1.6 }}>
+          La première assurance auto télématique au Maroc.
+        </p>
+      </div>
+
+      {/* Right panel */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 48px', background: '#f8f9fa'
+      }}>
+        <div style={{
+          width: '100%', maxWidth: 440, background: 'white',
+          borderRadius: 20, padding: '40px 36px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.08)'
+        }}>
+
+          {step === 'request' && !sent && (
+            <>
+              <h2 style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>Mot de passe oublié ?</h2>
+              <p style={{ fontSize: 14, color: '#666', marginBottom: 28 }}>
+                Entrez votre email et nous vous enverrons un lien de réinitialisation.
+              </p>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#888' }}>ADRESSE EMAIL</label>
+              <input
+                type="email"
+                placeholder="votre@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                style={{
+                  width: '100%', padding: '14px 16px', marginTop: 8, marginBottom: 20,
+                  border: '1.5px solid #e0e0e0', borderRadius: 12, fontSize: 14,
+                  outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+              <button onClick={handleRequestReset} disabled={loading || !email} style={{
+                width: '100%', padding: 16, background: '#1a5c2a', color: 'white',
+                border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', opacity: loading || !email ? 0.6 : 1
+              }}>
+                {loading ? 'Envoi...' : '→ Envoyer le lien'}
+              </button>
+            </>
+          )}
+
+          {step === 'request' && sent && (
+            <>
+              <h2 style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>Email envoyé !</h2>
+              <div style={{
+                background: '#f0faf3', border: '1.5px solid #2d7a3a',
+                borderRadius: 12, padding: 16, textAlign: 'center',
+                fontSize: 14, color: '#1a5c2a', fontWeight: 600, marginBottom: 20
+              }}>
+                ✓ Lien envoyé à {email}
+              </div>
+            </>
+          )}
+
+          {step === 'update' && (
+            <>
+              <h2 style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>Nouveau mot de passe</h2>
+              <p style={{ fontSize: 14, color: '#666', marginBottom: 28 }}>
+                Choisissez un nouveau mot de passe sécurisé.
+              </p>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#888' }}>NOUVEAU MOT DE PASSE</label>
+              <input
+                type="password"
+                placeholder="••••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={{
+                  width: '100%', padding: '14px 16px', marginTop: 8, marginBottom: 20,
+                  border: '1.5px solid #e0e0e0', borderRadius: 12, fontSize: 14,
+                  outline: 'none', boxSizing: 'border-box'
+                }}
+              />
+              <button onClick={handleUpdatePassword} disabled={loading || !password} style={{
+                width: '100%', padding: 16, background: '#1a5c2a', color: 'white',
+                border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', opacity: loading || !password ? 0.6 : 1
+              }}>
+                {loading ? 'Mise à jour...' : '✓ Confirmer le nouveau mot de passe'}
+              </button>
+            </>
+          )}
+
+          <button onClick={() => navigate('/login')} style={{
+            width: '100%', marginTop: 16, padding: 12, background: 'transparent',
+            border: '1.5px solid #e0e0e0', borderRadius: 12, fontSize: 14,
+            color: '#666', cursor: 'pointer', fontWeight: 600
+          }}>
+            ← Retour à la connexion
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+=== src/pages/Telematics.tsx ===
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const WAFA = {
+  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
+  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
+  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+}
+
+interface GpsPoint {
+  lat: number
+  lng: number
+  speed: number
+  timestamp: number
+  accuracy: number
+}
+
+interface AccelEvent {
+  type: 'freinage' | 'acceleration' | 'virage'
+  magnitude: number
+  timestamp: number
+}
+
+function calcDistance(p1: GpsPoint, p2: GpsPoint): number {
+  const R = 6371
+  const dLat = (p2.lat - p1.lat) * Math.PI / 180
+  const dLon = (p2.lng - p1.lng) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 +
+    Math.cos(p1.lat * Math.PI/180) * Math.cos(p2.lat * Math.PI/180) *
+    Math.sin(dLon/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
+function calcScore(events: AccelEvent[], speedMax: number): number {
+  let score = 100
+  const freinages = events.filter(e => e.type === 'freinage').length
+  const accelerations = events.filter(e => e.type === 'acceleration').length
+  score -= freinages * 3
+  score -= accelerations * 2
+  if (speedMax > 130) score -= 15
+  else if (speedMax > 110) score -= 8
+  else if (speedMax > 90) score -= 3
+  return Math.max(0, Math.min(100, score))
+}
+
+export default function Telematics() {
+  const navigate = useNavigate()
+  const [phase, setPhase] = useState<'idle'|'requesting'|'running'|'stopped'|'saving'>('idle')
+  const [error, setError] = useState('')
+  const [km, setKm] = useState(0)
+  const [speedKmh, setSpeedKmh] = useState(0)
+  const [speedMax, setSpeedMax] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [events, setEvents] = useState<AccelEvent[]>([])
+  const [score, setScore] = useState(100)
+  const [saved, setSaved] = useState(false)
+
+  const gpsPoints = useRef<GpsPoint[]>([])
+  const watchId = useRef<number | null>(null)
+  const timerRef = useRef<any>(null)
+  const startTime = useRef<number>(0)
+  const lastAccel = useRef({ x: 0, y: 0, z: 0, t: 0 })
+  const accelEvents = useRef<AccelEvent[]>([])
+
+  // Timer durée
+  useEffect(() => {
+    if (phase === 'running') {
+      startTime.current = Date.now()
+      timerRef.current = setInterval(() => {
+        setDuration(Math.floor((Date.now() - startTime.current) / 1000))
+      }, 1000)
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [phase])
+
+  // Accéléromètre
+  useEffect(() => {
+    if (phase !== 'running') return
+
+    function handleMotion(e: DeviceMotionEvent) {
+      const accel = e.accelerationIncludingGravity
+      if (!accel?.x || !accel?.y || !accel?.z) return
+      const now = Date.now()
+      if (now - lastAccel.current.t < 500) return
+
+      const dx = Math.abs(accel.x - lastAccel.current.x)
+      const dy = Math.abs(accel.y - lastAccel.current.y)
+      const magnitude = Math.sqrt(dx**2 + dy**2)
+
+      if (magnitude > 8) {
+        const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
+        const evt: AccelEvent = { type, magnitude, timestamp: now }
+        accelEvents.current.push(evt)
+        setEvents([...accelEvents.current])
+        setScore(calcScore(accelEvents.current, speedMax))
+      }
+
+      lastAccel.current = { x: accel.x, y: accel.y, z: accel.z, t: now }
+    }
+
+    window.addEventListener('devicemotion', handleMotion)
+    return () => window.removeEventListener('devicemotion', handleMotion)
+  }, [phase, speedMax])
+
+  async function startTrajet() {
+    setPhase('requesting')
+    setError('')
+
+    // Demande permission accéléromètre iOS
+    if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+      try {
+        const perm = await (DeviceMotionEvent as any).requestPermission()
+        if (perm !== 'granted') {
+          setError("Permission accéléromètre refusée. Activez dans Réglages > Safari.")
+          setPhase('idle')
+          return
+        }
+      } catch {}
+    }
+
+    // GPS
+    if (!navigator.geolocation) {
+      setError("GPS non disponible sur ce navigateur.")
+      setPhase('idle')
+      return
+    }
+
+    gpsPoints.current = []
+    accelEvents.current = []
+    setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0); setEvents([])
+
+    watchId.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const point: GpsPoint = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          speed: pos.coords.speed || 0,
+          timestamp: pos.timestamp,
+          accuracy: pos.coords.accuracy
+        }
+
+        const speedMs = pos.coords.speed || 0
+        const speedKmh = Math.round(speedMs * 3.6)
+        setSpeedKmh(speedKmh)
+        setSpeedMax(prev => Math.max(prev, speedKmh))
+
+        if (gpsPoints.current.length > 0) {
+          const last = gpsPoints.current[gpsPoints.current.length - 1]
+          const dist = calcDistance(last, point)
+          if (dist > 0.005) {
+            gpsPoints.current.push(point)
+            const total = gpsPoints.current.reduce((sum, p, i) => {
+              if (i === 0) return 0
+              return sum + calcDistance(gpsPoints.current[i-1], p)
+            }, 0)
+            setKm(+total.toFixed(2))
+          }
+        } else {
+          gpsPoints.current.push(point)
+        }
+      },
+      (err) => {
+        setError(`Erreur GPS : ${err.message}`)
+        setPhase('idle')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+
+    setPhase('running')
+  }
+
+  function stopTrajet() {
+    if (watchId.current) navigator.geolocation.clearWatch(watchId.current)
+    if (timerRef.current) clearInterval(timerRef.current)
+    const finalScore = calcScore(accelEvents.current, speedMax)
+    setScore(finalScore)
+    setPhase('stopped')
+  }
+
+  async function saveTrajet() {
+    setPhase('saving')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { navigate('/login'); return }
+    const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+    if (profile) {
+      await supabase.from('trajets').insert({
+        pseudo_id: profile.pseudo_id,
+        km: km,
+        type_route: speedMax > 90 ? 'autoroute' : speedMax > 50 ? 'route' : 'ville',
+        vitesse_moyenne: km > 0 && duration > 0 ? Math.round(km / duration * 3600) : 0,
+        vitesse_max: speedMax,
+        freinages_brusques: accelEvents.current.filter(e => e.type === 'freinage').length,
+        accelerations_brusques: accelEvents.current.filter(e => e.type === 'acceleration').length,
+        conduite_nocturne: new Date().getHours() >= 21 || new Date().getHours() <= 6,
+        score_trajet: score,
+        cout_mad: +(km * 0.5).toFixed(2),
+        date_trajet: new Date().toISOString().split('T')[0]
+      })
+      setSaved(true)
+      setTimeout(() => navigate('/dashboard'), 2000)
+    }
+  }
+
+  function formatDuration(s: number) {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m}m ${sec.toString().padStart(2,'0')}s`
+  }
+
+  const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : '#EF4444'
+
+  return (
+    <div style={{ minHeight:'100vh', background: WAFA.gris, fontFamily:'Inter,sans-serif' }}>
+      
+      {/* HEADER */}
+      <header style={{
+        background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+        padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between'
+      }}>
+        <button onClick={() => navigate('/dashboard')}
+          style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:10, padding:'8px 14px', cursor:'pointer', fontWeight:600, fontSize:13 }}>
+          ← Dashboard
+        </button>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ color:'white', fontWeight:800, fontSize:16 }}>🚗 Mode Télématique</div>
+          <div style={{ color:'rgba(255,255,255,0.6)', fontSize:11 }}>GPS + Accéléromètre</div>
+        </div>
+        <div style={{ width:80 }} />
+      </header>
+
+      <div style={{ maxWidth:480, margin:'0 auto', padding:'24px 16px' }}>
+
+        {error && (
+          <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'14px 18px', borderRadius:14, marginBottom:20, fontSize:13, fontWeight:500 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {saved && (
+          <div style={{ background:'#F0FDF4', border:'1px solid #86EFAC', color:WAFA.vert, padding:'16px 18px', borderRadius:14, marginBottom:20, fontSize:14, fontWeight:700, textAlign:'center' }}>
+            ✅ Trajet sauvegardé ! Redirection...
+          </div>
+        )}
+
+        {/* ÉCRAN IDLE */}
+        {phase === 'idle' && (
+          <div style={{ textAlign:'center' }}>
+            <div style={{ background:'white', borderRadius:24, padding:'48px 32px', boxShadow:'0 4px 24px rgba(0,0,0,0.08)', marginBottom:20 }}>
+              <div style={{ fontSize:64, marginBottom:20 }}>🚗</div>
+              <h2 style={{ fontSize:22, fontWeight:900, color:WAFA.noir, margin:'0 0 12px' }}>
+                Télématique réelle
+              </h2>
+              <p style={{ color:'#64748B', fontSize:14, lineHeight:1.7, margin:'0 0 32px' }}>
+                Votre téléphone va détecter automatiquement votre trajet via GPS et accéléromètre. Conduisez normalement.
+              </p>
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:32, textAlign:'left' }}>
+                {[
+                  { icon:'📍', text:'GPS trace votre route en temps réel' },
+                  { icon:'⚡', text:'Accéléromètre détecte les freinages' },
+                  { icon:'🏎️', text:'Vitesse mesurée automatiquement' },
+                  { icon:'📊', text:'Score calculé à la fin du trajet' },
+                ].map((f,i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:WAFA.gris, borderRadius:10 }}>
+                    <span style={{ fontSize:18 }}>{f.icon}</span>
+                    <span style={{ fontSize:13, color:WAFA.noir, fontWeight:500 }}>{f.text}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={startTrajet} style={{
+                width:'100%', padding:'18px', borderRadius:16,
+                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                color:'white', border:'none', fontWeight:900, fontSize:18,
+                cursor:'pointer', boxShadow:`0 8px 24px rgba(46,125,50,0.4)`
+              }}>
+                🚀 Démarrer le trajet
+              </button>
+              <p style={{ fontSize:11, color:'#94A3B8', marginTop:12 }}>
+                Autorisez l'accès GPS et aux capteurs quand demandé
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ÉCRAN REQUESTING */}
+        {phase === 'requesting' && (
+          <div style={{ textAlign:'center', padding:'60px 20px' }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>📍</div>
+            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Activation GPS...</h2>
+            <p style={{ color:'#64748B', fontSize:14 }}>Autorisez l'accès à votre position</p>
+          </div>
+        )}
+
+        {/* ÉCRAN RUNNING */}
+        {phase === 'running' && (
+          <div>
+            {/* Indicateur LIVE */}
+            <div style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+              marginBottom:20, padding:'10px', background:'#FEF2F2', borderRadius:12
+            }}>
+              <div style={{ width:10, height:10, borderRadius:'50%', background:'#EF4444', animation:'pulse 1s infinite' }} />
+              <span style={{ fontWeight:800, color:'#EF4444', fontSize:14 }}>EN COURS — {formatDuration(duration)}</span>
+            </div>
+
+            {/* Vitesse GRANDE */}
+            <div style={{
+              background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+              borderRadius:24, padding:'32px', textAlign:'center', marginBottom:16,
+              position:'relative', overflow:'hidden'
+            }}>
+              <div style={{ position:'absolute', top:-30, right:-30, width:120, height:120, borderRadius:'50%', background:'rgba(245,166,35,0.1)' }} />
+              <p style={{ color:'rgba(255,255,255,0.6)', fontSize:12, margin:'0 0 8px', letterSpacing:'1px' }}>VITESSE ACTUELLE</p>
+              <div style={{ fontSize:80, fontWeight:900, color:'white', lineHeight:1 }}>{speedKmh}</div>
+              <div style={{ fontSize:18, color:'rgba(255,255,255,0.7)', marginBottom:16 }}>km/h</div>
+              <div style={{ display:'inline-block', background:WAFA.or, color:WAFA.noir, padding:'6px 16px', borderRadius:20, fontSize:13, fontWeight:700 }}>
+                Max : {speedMax} km/h
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
+              <div style={{ background:'white', borderRadius:16, padding:'18px', textAlign:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize:11, color:'#94A3B8', fontWeight:700, marginBottom:4 }}>DISTANCE</div>
+                <div style={{ fontSize:32, fontWeight:900, color:WAFA.vert }}>{km.toFixed(2)}</div>
+                <div style={{ fontSize:13, color:'#94A3B8' }}>km</div>
+              </div>
+              <div style={{ background:'white', borderRadius:16, padding:'18px', textAlign:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontSize:11, color:'#94A3B8', fontWeight:700, marginBottom:4 }}>SCORE</div>
+                <div style={{ fontSize:32, fontWeight:900, color:scoreColor }}>{score}</div>
+                <div style={{ fontSize:13, color:'#94A3B8' }}>/100</div>
+              </div>
+            </div>
+
+            {/* Incidents */}
+            <div style={{ background:'white', borderRadius:16, padding:'16px 18px', marginBottom:20, boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'#94A3B8', marginBottom:12 }}>INCIDENTS DÉTECTÉS</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:'#FEF2F2', borderRadius:10 }}>
+                  <span style={{ fontSize:18 }}>🛑</span>
+                  <div>
+                    <div style={{ fontWeight:800, fontSize:16, color:'#EF4444' }}>
+                      {events.filter(e => e.type === 'freinage').length}
+                    </div>
+                    <div style={{ fontSize:11, color:'#94A3B8' }}>Freinages</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:WAFA.orLight, borderRadius:10 }}>
+                  <span style={{ fontSize:18 }}>⚡</span>
+                  <div>
+                    <div style={{ fontWeight:800, fontSize:16, color:WAFA.orDark }}>
+                      {events.filter(e => e.type === 'acceleration').length}
+                    </div>
+                    <div style={{ fontSize:11, color:'#94A3B8' }}>Accél. brusques</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Coût estimé */}
+            <div style={{ background:WAFA.orLight, borderRadius:14, padding:'12px 18px', marginBottom:20, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:13, color:WAFA.orDark, fontWeight:600 }}>💰 Coût estimé</span>
+              <span style={{ fontSize:18, fontWeight:900, color:WAFA.orDark }}>{(km * 0.5).toFixed(2)} MAD</span>
+            </div>
+
+            <button onClick={stopTrajet} style={{
+              width:'100%', padding:'18px', borderRadius:16,
+              background:'linear-gradient(135deg,#DC2626,#EF4444)',
+              color:'white', border:'none', fontWeight:900, fontSize:18,
+              cursor:'pointer', boxShadow:'0 8px 24px rgba(220,38,38,0.4)'
+            }}>
+              ⏹️ Terminer le trajet
+            </button>
+          </div>
+        )}
+
+        {/* ÉCRAN RÉSULTAT */}
+        {phase === 'stopped' && (
+          <div>
+            <div style={{ background:'white', borderRadius:24, padding:32, boxShadow:'0 4px 24px rgba(0,0,0,0.08)', marginBottom:16 }}>
+              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:'0 0 24px', textAlign:'center' }}>
+                🏁 Résumé du trajet
+              </h2>
+
+              {/* Score final */}
+              <div style={{
+                background: score >= 80 ? `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})` : score >= 60 ? `linear-gradient(135deg,${WAFA.orDark},${WAFA.or})` : 'linear-gradient(135deg,#DC2626,#EF4444)',
+                borderRadius:20, padding:'28px', textAlign:'center', marginBottom:24
+              }}>
+                <p style={{ color:'rgba(255,255,255,0.7)', fontSize:12, margin:'0 0 8px' }}>SCORE FINAL</p>
+                <div style={{ fontSize:72, fontWeight:900, color:'white', lineHeight:1 }}>{score}</div>
+                <div style={{ fontSize:16, color:'rgba(255,255,255,0.7)' }}>/100</div>
+                <div style={{ marginTop:12, fontSize:14, color:'white', fontWeight:700 }}>
+                  {score >= 90 ? '🏅 Excellent conducteur !' : score >= 80 ? '✅ Bon conducteur' : score >= 60 ? '⚠️ Conduite à améliorer' : '🔴 Conduite dangereuse'}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:24 }}>
+                {[
+                  { icon:'🛣️', val:`${km.toFixed(2)} km`, label:'Distance' },
+                  { icon:'⏱️', val:formatDuration(duration), label:'Durée' },
+                  { icon:'🏎️', val:`${speedMax} km/h`, label:'Vitesse max' },
+                  { icon:'🛑', val:events.filter(e=>e.type==='freinage').length, label:'Freinages' },
+                  { icon:'⚡', val:events.filter(e=>e.type==='acceleration').length, label:'Accél.' },
+                  { icon:'💰', val:`${(km*0.5).toFixed(2)} MAD`, label:'Coût' },
+                ].map((s,i) => (
+                  <div key={i} style={{ background:WAFA.gris, borderRadius:12, padding:'14px 10px', textAlign:'center' }}>
+                    <div style={{ fontSize:20, marginBottom:4 }}>{s.icon}</div>
+                    <div style={{ fontWeight:800, fontSize:15, color:WAFA.noir }}>{s.val}</div>
+                    <div style={{ fontSize:10, color:'#94A3B8', marginTop:2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Conseils */}
+              {events.filter(e=>e.type==='freinage').length > 2 && (
+                <div style={{ background:'#FEF2F2', borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:'#DC2626' }}>
+                  💡 <strong>Conseil :</strong> Anticipez davantage les ralentissements pour éviter les freinages brusques.
+                </div>
+              )}
+              {speedMax > 110 && (
+                <div style={{ background:WAFA.orLight, borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:WAFA.orDark }}>
+                  ⚠️ <strong>Vitesse :</strong> Vous avez dépassé 110 km/h. Restez dans les limites autorisées.
+                </div>
+              )}
+              {score >= 90 && (
+                <div style={{ background:'#F0FDF4', borderRadius:12, padding:'14px 16px', marginBottom:16, fontSize:13, color:WAFA.vert }}>
+                  🏅 <strong>Excellent !</strong> Vous bénéficiez d'une réduction de -15% sur votre prime ce mois.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display:'flex', gap:12 }}>
+              <button onClick={() => { setPhase('idle'); setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0); setEvents([]); setScore(100) }}
+                style={{ flex:1, padding:'16px', borderRadius:14, border:`2px solid ${WAFA.vert}`, background:'white', color:WAFA.vert, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                🔄 Nouveau trajet
+              </button>
+              <button onClick={saveTrajet} style={{
+                flex:2, padding:'16px', borderRadius:14,
+                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                color:'white', border:'none', fontWeight:800, fontSize:14,
+                cursor:'pointer', boxShadow:`0 6px 20px rgba(46,125,50,0.4)`
+              }}>
+                💾 Sauvegarder dans DriveScore
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'saving' && (
+          <div style={{ textAlign:'center', padding:'60px 20px' }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>💾</div>
+            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Sauvegarde en cours...</h2>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.2); }
+        }
+      `}</style>
+    </div>
+  )
+}
+=== src/pages/Trajets.tsx ===
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+export default function Trajets() {
+  const navigate = useNavigate()
+  const [form, setForm] = useState({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [trajets, setTrajets] = useState<any[]>([])
+
+  const score = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 5 - (form.conduite_nocturne ? 5 : 0))
+  const scoreColor = score >= 80 ? '#065F46' : score >= 60 ? '#F97316' : '#EF4444'
+
+  useEffect(() => {
+    async function loadTrajets() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+      if (profile) {
+        const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', profile.pseudo_id).order('created_at', { ascending: false }).limit(10)
+        setTrajets(data || [])
+      }
+    }
+    loadTrajets()
+  }, [success])
+
+  async function soumettre(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { navigate('/login'); return }
+    const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+    if (profile) {
+      const km = parseFloat(form.km)
+      await supabase.from('trajets').insert({
+        pseudo_id: profile.pseudo_id,
+        km, type_route: form.type_route,
+        ville_depart: form.ville_depart,
+        ville_arrivee: form.ville_arrivee,
+        conduite_nocturne: form.conduite_nocturne,
+        freinages_brusques: form.freinages_brusques,
+        exces_vitesse_count: form.exces_vitesse_count,
+        score_trajet: score,
+        cout_mad: parseFloat((km * 0.5).toFixed(2))
+      })
+      setSuccess(true)
+      setForm({ km:'', type_route:'ville', ville_depart:'', ville_arrivee:'', conduite_nocturne:false, freinages_brusques:0, exces_vitesse_count:0 })
+      setTimeout(() => setSuccess(false), 3000)
+    }
+    setLoading(false)
+  }
+
+  const inp = { width:'100%', padding:'12px 16px', borderRadius:12, border:'1.5px solid #E2E8F0', fontSize:14, outline:'none', boxSizing:'border-box' } as React.CSSProperties
+
+  return (
+    <div style={{minHeight:'100vh',background:'#F8FAFC',fontFamily:'Inter,sans-serif'}}>
+      <header style={{background:'white',borderBottom:'1px solid #E2E8F0',padding:'14px 24px',display:'flex',alignItems:'center',gap:16}}>
+        <button onClick={() => navigate('/dashboard')} style={{background:'none',border:'none',cursor:'pointer',color:'#64748B',fontWeight:600,fontSize:14,display:'flex',alignItems:'center',gap:4}}>
+          ← Dashboard
+        </button>
+        <h1 style={{fontSize:18,fontWeight:700,color:'#0F172A',margin:0}}>Déclarer un trajet</h1>
+      </header>
+
+      <div style={{maxWidth:600,margin:'0 auto',padding:'24px 16px'}}>
+        {success && (
+          <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:12,padding:'16px',marginBottom:20,color:'#065F46',fontWeight:600,fontSize:14,textAlign:'center'}}>
+            ✅ Trajet enregistré ! Score : {score}/100
+          </div>
+        )}
+
+        <div style={{background:'white',borderRadius:20,padding:24,boxShadow:'0 1px 4px rgba(0,0,0,0.08)',marginBottom:20}}>
+          <div style={{background:'linear-gradient(135deg,#065F46,#047857)',borderRadius:16,padding:20,marginBottom:20,textAlign:'center',color:'white'}}>
+            <p style={{margin:'0 0 4px',fontSize:13,opacity:0.8}}>Score estimé de ce trajet</p>
+            <div style={{fontSize:56,fontWeight:800,lineHeight:1}}>{score}</div>
+            <div style={{fontSize:14,opacity:0.8}}>/100</div>
+          </div>
+
+          <form onSubmit={soumettre} style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:600,color:'#374151',marginBottom:6}}>Kilomètres parcourus *</label>
+              <input type="number" required min="1" max="1999" placeholder="Ex: 45" value={form.km}
+                onChange={e => setForm(f => ({...f, km: e.target.value}))} style={inp} />
+              {form.km && <p style={{fontSize:12,color:'#F97316',margin:'4px 0 0'}}>Coût estimé : {(parseFloat(form.km||'0') * 0.5).toFixed(2)} MAD</p>}
+            </div>
+
+            <div>
+              <label style={{display:'block',fontSize:14,fontWeight:600,color:'#374151',marginBottom:8}}>Type de route</label>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+                {[{id:'ville',label:'🏙️ Ville'},{id:'route',label:'🛣️ Route'},{id:'autoroute',label:'🚀 Auto'},{id:'mixte',label:'🔀 Mixte'}].map(t => (
+                  <button key={t.id} type="button" onClick={() => setForm(f => ({...f, type_route:t.id}))}
+                    style={{padding:'10px 6px',borderRadius:10,border:`2px solid ${form.type_route===t.id?'#065F46':'#E2E8F0'}`,background:form.type_route===t.id?'#F0FDF4':'white',color:form.type_route===t.id?'#065F46':'#374151',fontWeight:600,fontSize:12,cursor:'pointer'}}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div>
+                <label style={{display:'block',fontSize:13,fontWeight:600,color:'#374151',marginBottom:5}}>Ville départ</label>
+                <input placeholder="Casablanca" value={form.ville_depart} onChange={e => setForm(f => ({...f, ville_depart:e.target.value}))} style={inp} />
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:13,fontWeight:600,color:'#374151',marginBottom:5}}>Ville arrivée</label>
+                <input placeholder="Rabat" value={form.ville_arrivee} onChange={e => setForm(f => ({...f, ville_arrivee:e.target.value}))} style={inp} />
+              </div>
+            </div>
+
+            <div style={{background:'#FFF7ED',borderRadius:12,padding:16}}>
+              <p style={{fontSize:13,fontWeight:700,color:'#F97316',margin:'0 0 12px'}}>⚠️ Incidents de conduite</p>
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:13,color:'#374151'}}>🛑 Freinages brusques (-3pts chacun)</span>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <button type="button" onClick={() => setForm(f => ({...f, freinages_brusques:Math.max(0,f.freinages_brusques-1)}))}
+                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>-</button>
+                    <span style={{fontWeight:700,minWidth:20,textAlign:'center'}}>{form.freinages_brusques}</span>
+                    <button type="button" onClick={() => setForm(f => ({...f, freinages_brusques:f.freinages_brusques+1}))}
+                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>+</button>
+                  </div>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:13,color:'#374151'}}>🚨 Excès de vitesse (-5pts chacun)</span>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <button type="button" onClick={() => setForm(f => ({...f, exces_vitesse_count:Math.max(0,f.exces_vitesse_count-1)}))}
+                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>-</button>
+                    <span style={{fontWeight:700,minWidth:20,textAlign:'center'}}>{form.exces_vitesse_count}</span>
+                    <button type="button" onClick={() => setForm(f => ({...f, exces_vitesse_count:f.exces_vitesse_count+1}))}
+                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>+</button>
+                  </div>
+                </div>
+                <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,color:'#374151',cursor:'pointer'}}>
+                  <input type="checkbox" checked={form.conduite_nocturne} onChange={e => setForm(f => ({...f, conduite_nocturne:e.target.checked}))} style={{accentColor:'#065F46'}} />
+                  🌙 Conduite nocturne (-5pts)
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" disabled={loading}
+              style={{padding:'16px',borderRadius:14,background:scoreColor,color:'white',border:'none',fontWeight:700,fontSize:16,cursor:'pointer'}}>
+              {loading ? 'Enregistrement...' : `✅ Enregistrer — Score ${score}/100`}
+            </button>
+          </form>
+        </div>
+
+        {trajets.length > 0 && (
+          <div style={{background:'white',borderRadius:20,padding:24,boxShadow:'0 1px 4px rgba(0,0,0,0.08)'}}>
+            <h2 style={{fontSize:16,fontWeight:700,color:'#0F172A',marginBottom:16}}>Historique récent</h2>
+            {trajets.map((t,i) => (
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',background:'#F8FAFC',borderRadius:10,marginBottom:8}}>
+                <div>
+                  <p style={{fontWeight:600,fontSize:14,color:'#0F172A',margin:0}}>{t.km} km — {t.type_route}</p>
+                  <p style={{fontSize:12,color:'#94A3B8',margin:0}}>{t.date_trajet} · {t.cout_mad} MAD</p>
+                </div>
+                <div style={{padding:'4px 10px',borderRadius:20,fontSize:13,fontWeight:700,background:t.score_trajet>=80?'#F0FDF4':'#FFF7ED',color:t.score_trajet>=80?'#065F46':'#F97316'}}>
+                  {t.score_trajet}/100
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

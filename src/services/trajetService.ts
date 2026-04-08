@@ -1,0 +1,47 @@
+// ============================================
+// SERVICE TRAJET — CRUD trajets Supabase
+// ============================================
+
+import { supabase } from '../lib/supabase'
+import { Trajet } from '../types'
+
+export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]> {
+  const { data, error } = await supabase
+    .from('trajets')
+    .select('*')
+    .eq('pseudo_id', pseudoId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) { console.error('getTrajets:', error); return [] }
+  return data || []
+}
+
+export async function insertTrajet(trajet: Omit<Trajet, 'id' | 'created_at'>): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from('trajets').insert(trajet)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function getTrajetStats(pseudoId: string): Promise<{
+  totalKm: number
+  avgScore: number
+  totalTrajets: number
+  totalCout: number
+}> {
+  const trajets = await getTrajets(pseudoId, 100)
+  if (trajets.length === 0) return { totalKm: 0, avgScore: 0, totalTrajets: 0, totalCout: 0 }
+
+  const totalKm = trajets.reduce((s, t) => s + (t.km || 0), 0)
+  const avgScore = Math.round(trajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajets.length)
+  const totalCout = trajets.reduce((s, t) => s + (t.cout_mad || 0), 0)
+
+  return { totalKm, avgScore, totalTrajets: trajets.length, totalCout }
+}
+
+export async function getAllTrajets(): Promise<Trajet[]> {
+  const { data, error } = await supabase
+    .from('trajets')
+    .select('pseudo_id, score_trajet, km, type_route, freinages_brusques')
+  if (error) { console.error('getAllTrajets:', error); return [] }
+  return data || []
+}
