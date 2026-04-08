@@ -84,13 +84,13 @@ export default function Telematics() {
       const accel = e.accelerationIncludingGravity
       if (!accel?.x || !accel?.y || !accel?.z) return
       const now = Date.now()
-      if (now - lastAccel.current.t < 500) return
+      if (now - lastAccel.current.t < 2000) return
 
       const dx = Math.abs(accel.x - lastAccel.current.x)
       const dy = Math.abs(accel.y - lastAccel.current.y)
       const magnitude = Math.sqrt(dx**2 + dy**2)
 
-      if (magnitude > 4) {
+      if (magnitude > 7) {
         const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
         const evt: AccelEvent = { type, magnitude, timestamp: now }
         accelEvents.current.push(evt)
