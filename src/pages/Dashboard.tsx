@@ -48,15 +48,10 @@ export default function Dashboard() {
 
         if (profile?.pseudo_id) {
           const now = new Date()
-          const debut = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-          const fin = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
-
           const { data: trajetsData } = await supabase
             .from('trajets')
             .select('*')
             .eq('pseudo_id', profile.pseudo_id)
-            .gte('date_trajet', debut.split('T')[0])
-            .lte('date_trajet', fin.split('T')[0])
             .order('created_at', { ascending: false })
 
           if (trajetsData && trajetsData.length > 0) {
