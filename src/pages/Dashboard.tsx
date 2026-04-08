@@ -1,119 +1,57 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+import { useDashboard } from '../hooks/useDashboard'
+import { WAFA } from '../config/wafa'
+import { Badge, Trajet } from '../types'
 
-const WAFA = {
-  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
-  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
-  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+function calculerBadges(score: number, km: number, trajets: Trajet[]): Badge[] {
+  const result: Badge[] = []
+  const totalTrajets = trajets.length
+  const totalFreinages = trajets.reduce((s, t) => s + (t.freinages_brusques || 0), 0)
+  const avgFreinages = totalTrajets > 0 ? totalFreinages / totalTrajets : 0
+  const trajetsVille = trajets.filter(t => t.type_route === 'ville').length
+
+  if (totalTrajets >= 50) result.push({ icon: '🚗', label: 'Grand conducteur', desc: '50 trajets effectués', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+  else if (totalTrajets >= 10) result.push({ icon: '🚗', label: 'Conducteur régulier', desc: '10 trajets effectués', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+  else if (totalTrajets >= 1) result.push({ icon: '🚗', label: 'Premier trajet', desc: 'Bienvenue sur DriveScore', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+  if (score >= 95) result.push({ icon: '🏅', label: 'Conducteur élite', desc: 'Score >= 95/100', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+  else if (score >= 85) result.push({ icon: '🏅', label: 'Bon conducteur', desc: 'Score >= 85/100', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+  else if (score >= 70) result.push({ icon: '🏅', label: 'En progression', desc: 'Score >= 70/100', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+  if (km <= 100) result.push({ icon: '🌿', label: 'Éco champion', desc: '< 100 km ce mois', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+  else if (km <= 300) result.push({ icon: '🌿', label: 'Éco-driver', desc: '< 300 km ce mois', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+  else if (km <= 500) result.push({ icon: '🌿', label: 'Conducteur sobre', desc: '< 500 km ce mois', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+  if (totalTrajets >= 5 && avgFreinages === 0) result.push({ icon: '🛡️', label: 'Conduite parfaite', desc: '0 freinage sur 5 trajets', level: '🥇 Or', color: WAFA.vert, bg: '#F0FDF4' })
+  else if (avgFreinages < 2 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite douce', desc: '< 2 freinages/trajet', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+  else if (avgFreinages < 5 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite sûre', desc: '< 5 freinages/trajet', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+  if (trajetsVille >= 50) result.push({ icon: '🏙️', label: 'Maître urbain', desc: '50 trajets en ville', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
+  else if (trajetsVille >= 20) result.push({ icon: '🏙️', label: 'Citadin confirmé', desc: '20 trajets en ville', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
+  else if (trajetsVille >= 5) result.push({ icon: '🏙️', label: 'Conducteur urbain', desc: '5 trajets en ville', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+
+  return result
 }
 
 export default function Dashboard() {
-  const [prenom, setPrenom] = useState('')
-  const [score, setScore] = useState(0)
-  const [km, setKm] = useState(0)
-  const [trajets, setTrajets] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
-  const [afficherLeaderboard, setAfficherLeaderboard] = useState(false)
   const navigate = useNavigate()
+  const { profile, loading: authLoading, logout } = useAuth()
+  const { trajets, score, km, facture, loading: dataLoading, scoreColor, scoreLabel } = useDashboard(profile?.pseudo_id)
+  const isMobile = window.innerWidth < 640
 
-  const estimation = Math.round(200 + km * 0.5)
-  const reduction = score >= 90 ? Math.round(estimation * 0.15)
-    : score >= 80 ? Math.round(estimation * 0.10)
-    : score >= 70 ? Math.round(estimation * 0.05) : 0
-  const total = estimation - reduction
-  const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : '#EF4444'
+  const loading = authLoading || dataLoading
+  const BADGES = calculerBadges(score, km, trajets)
   const scoreBg = score >= 80 ? '#F0FDF4' : score >= 60 ? WAFA.orLight : '#FEF2F2'
-  const scoreLabel = score >= 80 ? '🏅 Excellent' : score >= 60 ? '⚠️ Moyen' : '🔴 À améliorer'
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { navigate('/login'); return }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('prenom, pseudo_id, afficher_leaderboard')
-          .eq('id', user.id)
-          .single()
-
-        if (profile?.prenom) setPrenom(profile.prenom)
-        setAfficherLeaderboard(profile?.afficher_leaderboard || false)
-
-        if (profile?.pseudo_id) {
-          const now = new Date()
-          const { data: trajetsData } = await supabase
-            .from('trajets')
-            .select('*')
-            .eq('pseudo_id', profile.pseudo_id)
-            .order('created_at', { ascending: false })
-
-          if (trajetsData && trajetsData.length > 0) {
-            const totalKm = trajetsData.reduce((s, t) => s + (t.km || 0), 0)
-            const avgScore = Math.round(trajetsData.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajetsData.length)
-            setKm(totalKm)
-            setScore(avgScore)
-            setTrajets(trajetsData.slice(0, 5))
-          }
-        }
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [navigate])
-
-  async function logout() {
-    await supabase.auth.signOut()
-    navigate('/login')
-  }
 
   async function toggleLeaderboard(val: boolean) {
-    setAfficherLeaderboard(val)
+    if (!profile) return
+    const { updateProfile } = await import('../services/profileService')
+    const { supabase } = await import('../lib/supabase')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('profiles').update({ afficher_leaderboard: val }).eq('id', user.id)
+    await updateProfile(user.id, { afficher_leaderboard: val })
   }
-
-  const BADGES = (() => {
-    const result = []
-    const totalTrajets = trajets.length
-    const totalFreinages = trajets.reduce((s, t) => s + (t.freinages_brusques || 0), 0)
-    const avgFreinages = totalTrajets > 0 ? totalFreinages / totalTrajets : 0
-    const trajetsVille = trajets.filter(t => t.type_route === 'ville').length
-
-    if (totalTrajets >= 50) result.push({ icon: '🚗', label: 'Grand conducteur', desc: '50 trajets effectués', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-    else if (totalTrajets >= 10) result.push({ icon: '🚗', label: 'Conducteur régulier', desc: '10 trajets effectués', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-    else if (totalTrajets >= 1) result.push({ icon: '🚗', label: 'Premier trajet', desc: 'Bienvenue sur DriveScore', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
-
-    if (score >= 95) result.push({ icon: '🏅', label: 'Conducteur élite', desc: 'Score >= 95/100', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-    else if (score >= 85) result.push({ icon: '🏅', label: 'Bon conducteur', desc: 'Score >= 85/100', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-    else if (score >= 70) result.push({ icon: '🏅', label: 'En progression', desc: 'Score >= 70/100', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
-
-    if (km <= 100) result.push({ icon: '🌿', label: 'Eco champion', desc: '< 100 km ce mois', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-    else if (km <= 300) result.push({ icon: '🌿', label: 'Eco-driver', desc: '< 300 km ce mois', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-    else if (km <= 500) result.push({ icon: '🌿', label: 'Conducteur sobre', desc: '< 500 km ce mois', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
-
-    if (totalTrajets >= 5 && avgFreinages === 0) result.push({ icon: '🛡️', label: 'Conduite parfaite', desc: '0 freinage sur 5 trajets', level: '🥇 Or', color: WAFA.vert, bg: '#F0FDF4' })
-    else if (avgFreinages < 2 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite douce', desc: '< 2 freinages/trajet', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-    else if (avgFreinages < 5 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite sure', desc: '< 5 freinages/trajet', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
-
-    if (trajetsVille >= 50) result.push({ icon: '🏙️', label: 'Maitre urbain', desc: '50 trajets en ville', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-    else if (trajetsVille >= 20) result.push({ icon: '🏙️', label: 'Citadin confirme', desc: '20 trajets en ville', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-    else if (trajetsVille >= 5) result.push({ icon: '🏙️', label: 'Conducteur urbain', desc: '5 trajets en ville', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
-
-    return result
-  })()
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: WAFA.gris }}>
@@ -128,6 +66,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif' }}>
 
+      {/* HEADER */}
       <header style={{
         background: 'white', borderBottom: `1px solid ${WAFA.grisMid}`,
         padding: isMobile ? '0 12px' : '0 32px',
@@ -145,40 +84,20 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => navigate('/telematics')} style={{
-            background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-            color: 'white', border: 'none', borderRadius: 8,
-            padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
-          }}>🚗</button>
-          <button onClick={() => navigate('/leaderboard')} style={{
-            background: '#EFF6FF', border: '1.5px solid #3B82F6',
-            color: '#1D4ED8', borderRadius: 8,
-            padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
-          }}>🏆</button>
-          <button onClick={() => navigate('/trajets')} style={{
-            background: WAFA.orLight, border: `1.5px solid ${WAFA.or}`,
-            color: WAFA.orDark, borderRadius: 8,
-            padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
-          }}>+ Trajet</button>
-          <button onClick={logout} style={{
-            background: 'none', border: `1.5px solid ${WAFA.grisMid}`,
-            color: '#EF4444', borderRadius: 8, padding: '7px 10px',
-            fontWeight: 600, fontSize: 12, cursor: 'pointer'
-          }}>⬅️</button>
+          <button onClick={() => navigate('/telematics')} style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color: 'white', border: 'none', borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🚗</button>
+          <button onClick={() => navigate('/leaderboard')} style={{ background: '#EFF6FF', border: '1.5px solid #3B82F6', color: '#1D4ED8', borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🏆</button>
+          <button onClick={() => navigate('/trajets')} style={{ background: WAFA.orLight, border: `1.5px solid ${WAFA.or}`, color: WAFA.orDark, borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>+ Trajet</button>
+          <button onClick={logout} style={{ background: 'none', border: `1.5px solid ${WAFA.grisMid}`, color: '#EF4444', borderRadius: 8, padding: '7px 10px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>⬅️</button>
         </div>
       </header>
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '12px' : '32px 20px' }}>
 
         {/* GREETING */}
-        <div style={{
-          background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-          borderRadius: 16, padding: isMobile ? '16px' : '24px 28px', marginBottom: 16,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
+        <div style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius: 16, padding: isMobile ? '16px' : '24px 28px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 style={{ color: 'white', fontSize: isMobile ? 18 : 24, fontWeight: 900, margin: '0 0 4px' }}>
-              Bonjour {prenom} 👋
+              Bonjour {profile?.prenom} 👋
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, margin: 0 }}>
               {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
@@ -186,13 +105,12 @@ export default function Dashboard() {
           </div>
           <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 10, padding: '8px 12px', textAlign: 'center', flexShrink: 0, marginLeft: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 2 }}>FACTURE DU MOIS</div>
-            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 900 }}>{total} MAD</div>
+            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 900 }}>{facture?.total ?? 200} MAD</div>
           </div>
         </div>
 
         {/* KPI CARDS */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
-
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `4px solid ${scoreColor}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>SCORE CONDUITE</span>
@@ -203,9 +121,7 @@ export default function Dashboard() {
             <div style={{ background: WAFA.grisMid, borderRadius: 8, height: 6, overflow: 'hidden', marginBottom: 8 }}>
               <div style={{ width: `${score}%`, height: '100%', background: scoreColor, borderRadius: 8 }} />
             </div>
-            <div style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 20, background: scoreBg, color: scoreColor, fontSize: 11, fontWeight: 700 }}>
-              {scoreLabel}
-            </div>
+            <div style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 20, background: scoreBg, color: scoreColor, fontSize: 11, fontWeight: 700 }}>{scoreLabel}</div>
           </div>
 
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '4px solid #3B82F6' }}>
@@ -216,9 +132,7 @@ export default function Dashboard() {
             <div style={{ fontSize: 44, fontWeight: 900, color: '#3B82F6', lineHeight: 1, marginBottom: 4 }}>{km}</div>
             <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>kilomètres parcourus</div>
             <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>
-                {trajets.length} trajet{trajets.length > 1 ? 's' : ''} ce mois
-              </div>
+              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>💡 {trajets.length} trajet{trajets.length > 1 ? 's' : ''} enregistré{trajets.length > 1 ? 's' : ''}</div>
             </div>
           </div>
 
@@ -227,19 +141,16 @@ export default function Dashboard() {
               <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>FACTURE ESTIMÉE</span>
               <span>💰</span>
             </div>
-            <div style={{ fontSize: 44, fontWeight: 900, color: WAFA.orDark, lineHeight: 1, marginBottom: 4 }}>{total}</div>
+            <div style={{ fontSize: 44, fontWeight: 900, color: WAFA.orDark, lineHeight: 1, marginBottom: 4 }}>{facture?.total ?? 200}</div>
             <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>MAD ce mois</div>
             <div style={{ background: WAFA.orLight, borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>
-                200 + {km}×0,50 − {reduction} MAD
-              </div>
+              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>200 + {km}×0,50 − {facture?.reduction ?? 0} MAD</div>
             </div>
           </div>
         </div>
 
         {/* BADGES + FACTURE */}
         <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
-
           <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🎖️ Mes badges</h2>
@@ -253,16 +164,12 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {BADGES.map((b, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10, border: `1px solid ${b.color}20` }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>
-                      {b.icon}
-                    </div>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>{b.icon}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
                       <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>{b.desc}</div>
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: b.color, background: 'white', padding: '3px 8px', borderRadius: 20, border: `1px solid ${b.color}30`, whiteSpace: 'nowrap' }}>
-                      {b.level}
-                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: b.color, background: 'white', padding: '3px 8px', borderRadius: 20, border: `1px solid ${b.color}30`, whiteSpace: 'nowrap' }}>{b.level}</div>
                   </div>
                 ))}
               </div>
@@ -279,7 +186,7 @@ export default function Dashboard() {
             {[
               { label: 'Abonnement de base', val: '200,00 MAD', color: WAFA.noir },
               { label: `${km} km × 0,50 MAD/km`, val: `${(km * 0.5).toFixed(2)} MAD`, color: WAFA.noir },
-              { label: `Réduction score (${score}/100)`, val: `-${reduction},00 MAD`, color: WAFA.vert },
+              { label: `Réduction score (${score}/100)`, val: `-${facture?.reduction ?? 0},00 MAD`, color: WAFA.vert },
             ].map((l, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${WAFA.grisMid}` }}>
                 <span style={{ fontSize: 12, color: '#64748B', flex: 1, paddingRight: 8 }}>{l.label}</span>
@@ -288,7 +195,7 @@ export default function Dashboard() {
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, padding: '12px 14px', background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius: 10 }}>
               <span style={{ fontWeight: 800, color: 'white', fontSize: 13 }}>TOTAL</span>
-              <span style={{ fontWeight: 900, fontSize: 20, color: WAFA.or }}>{total} MAD</span>
+              <span style={{ fontWeight: 900, fontSize: 20, color: WAFA.or }}>{facture?.total ?? 200} MAD</span>
             </div>
           </div>
         </div>
@@ -297,17 +204,13 @@ export default function Dashboard() {
         <div style={{ background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🗺️ Derniers trajets</h2>
-            <button onClick={() => navigate('/trajets')} style={{
-              background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-              color: 'white', border: 'none', borderRadius: 8,
-              padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
-            }}>+ Nouveau</button>
+            <button onClick={() => navigate('/trajets')} style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>+ Nouveau</button>
           </div>
 
           {trajets.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94A3B8', fontSize: 14 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🛣️</div>
-              Aucun trajet ce mois — commencez à conduire !
+              Aucun trajet enregistré — commencez à conduire !
             </div>
           ) : (
             trajets.map((t, i) => (
@@ -325,9 +228,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: t.score_trajet >= 90 ? WAFA.vert : t.score_trajet >= 75 ? WAFA.orDark : '#EF4444' }}>
-                      {t.score_trajet}/100
-                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: t.score_trajet >= 90 ? WAFA.vert : t.score_trajet >= 75 ? WAFA.orDark : '#EF4444' }}>{t.score_trajet}/100</div>
                     <div style={{ fontSize: 12, color: WAFA.orDark, fontWeight: 700 }}>{t.cout_mad} MAD</div>
                   </div>
                 </div>
@@ -338,9 +239,7 @@ export default function Dashboard() {
           {trajets.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: WAFA.orLight, borderRadius: 10, marginTop: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.orDark }}>Total ({trajets.length} trajets)</span>
-              <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>
-                {trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(1)} MAD
-              </span>
+              <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>{trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(1)} MAD</span>
             </div>
           )}
         </div>
@@ -351,16 +250,8 @@ export default function Dashboard() {
             <div style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir, marginBottom: 2 }}>🏆 Apparaître dans le classement</div>
             <div style={{ fontSize: 11, color: '#94A3B8' }}>Votre score sera visible par les autres conducteurs</div>
           </div>
-          <div onClick={() => toggleLeaderboard(!afficherLeaderboard)} style={{
-            width: 48, height: 26, borderRadius: 13, cursor: 'pointer',
-            background: afficherLeaderboard ? WAFA.vert : WAFA.grisMid,
-            position: 'relative', transition: 'background 0.3s', flexShrink: 0
-          }}>
-            <div style={{
-              position: 'absolute', top: 3, left: afficherLeaderboard ? 25 : 3,
-              width: 20, height: 20, borderRadius: '50%', background: 'white',
-              transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
-            }} />
+          <div onClick={() => toggleLeaderboard(!(profile?.afficher_leaderboard))} style={{ width: 48, height: 26, borderRadius: 13, cursor: 'pointer', background: profile?.afficher_leaderboard ? WAFA.vert : WAFA.grisMid, position: 'relative', transition: 'background 0.3s', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: 3, left: profile?.afficher_leaderboard ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
           </div>
         </div>
 
