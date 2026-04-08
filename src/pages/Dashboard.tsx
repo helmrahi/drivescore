@@ -117,6 +117,11 @@ export default function Dashboard() {
             color: 'white', border: 'none', borderRadius: 8,
             padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
           }}>🚗</button>
+          <button onClick={() => navigate('/leaderboard')} style={{
+            background: '#EFF6FF', border: '1.5px solid #3B82F6',
+            color: '#1D4ED8', borderRadius: 8,
+            padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer'
+          }}>🏆</button>
           <button onClick={() => navigate('/trajets')} style={{
             background: WAFA.orLight, border: `1.5px solid ${WAFA.or}`,
             color: WAFA.orDark, borderRadius: 8,
