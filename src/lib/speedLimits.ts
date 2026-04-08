@@ -35,13 +35,13 @@ export async function getLimiteOSM(lat: number, lng: number): Promise<SpeedLimit
 
   try {
     const query = `
-      [out:json][timeout:5];
-      way(around:30,${lat},${lng})["maxspeed"];
+      [out:json][timeout:3];
+      way(around:15,${lat},${lng})["maxspeed"];
       out tags;
     `
     const response = await fetch(
-      `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-      { signal: AbortSignal.timeout(5000) }
+      `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`,
+      { signal: AbortSignal.timeout(3000) }
     )
     
     if (!response.ok) return null
