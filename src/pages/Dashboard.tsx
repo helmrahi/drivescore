@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [trajets, setTrajets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
+  const [afficherLeaderboard, setAfficherLeaderboard] = useState(false)
   const navigate = useNavigate()
 
   const estimation = Math.round(200 + km * 0.5)
@@ -40,11 +41,12 @@ export default function Dashboard() {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('prenom, pseudo_id')
+          .select('prenom, pseudo_id, afficher_leaderboard')
           .eq('id', user.id)
           .single()
 
         if (profile?.prenom) setPrenom(profile.prenom)
+        setAfficherLeaderboard(profile?.afficher_leaderboard || false)
 
         if (profile?.pseudo_id) {
           const now = new Date()
@@ -74,6 +76,13 @@ export default function Dashboard() {
   async function logout() {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  async function toggleLeaderboard(val: boolean) {
+    setAfficherLeaderboard(val)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('profiles').update({ afficher_leaderboard: val }).eq('id', user.id)
   }
 
   const BADGES = [
@@ -306,6 +315,25 @@ export default function Dashboard() {
               </span>
             </div>
           )}
+        </div>
+
+        {/* TOGGLE LEADERBOARD */}
+        <div style={{ background: 'white', borderRadius: 16, padding: '16px 18px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir, marginBottom: 2 }}>🏆 Apparaître dans le classement</div>
+            <div style={{ fontSize: 11, color: '#94A3B8' }}>Votre score sera visible par les autres conducteurs</div>
+          </div>
+          <div onClick={() => toggleLeaderboard(!afficherLeaderboard)} style={{
+            width: 48, height: 26, borderRadius: 13, cursor: 'pointer',
+            background: afficherLeaderboard ? WAFA.vert : WAFA.grisMid,
+            position: 'relative', transition: 'background 0.3s', flexShrink: 0
+          }}>
+            <div style={{
+              position: 'absolute', top: 3, left: afficherLeaderboard ? 25 : 3,
+              width: 20, height: 20, borderRadius: '50%', background: 'white',
+              transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+            }} />
+          </div>
         </div>
 
         {/* FOOTER */}

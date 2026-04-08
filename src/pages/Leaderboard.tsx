@@ -70,7 +70,8 @@ export default function Leaderboard() {
 
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('pseudo_id, prenom, nom')
+          .select('pseudo_id, prenom, nom, afficher_leaderboard')
+          .eq('afficher_leaderboard', true)
 
         if (!profiles || profiles.length === 0) { setLoading(false); return }
 
