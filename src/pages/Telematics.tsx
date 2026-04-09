@@ -56,8 +56,8 @@ export default function Telematics() {
           ← Tableau de bord
         </button>
         <div style={{ textAlign:"center" }}>
-          <div style={{ color:"white", fontWeight:800, fontSize:16 }}>Mode Telematique</div>
-          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>GPS + Accelerometre</div>
+          <div style={{ color:"white", fontWeight:800, fontSize:16 }}>Mode Télématique</div>
+          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>GPS + Accéléromètre</div>
         </div>
         <div style={{ width:80 }} />
       </header>
