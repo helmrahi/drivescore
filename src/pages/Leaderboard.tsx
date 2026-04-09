@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const WAFA = {
@@ -50,6 +50,7 @@ function getMedal(rank: number) {
 
 export default function Leaderboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [loading, setLoading] = useState(true)
   const [myPseudoId, setMyPseudoId] = useState('')
@@ -84,7 +85,7 @@ export default function Leaderboard() {
           const avgScore = myTrajets.length > 0
             ? Math.round(myTrajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / myTrajets.length)
             : 0
-          const totalKm = myTrajets.reduce((s, t) => s + (t.km || 0), 0)
+          const totalKm = parseFloat(myTrajets.reduce((s, t) => s + (t.km || 0), 0).toFixed(1))
           const badge = getBadge(avgScore, myTrajets.length)
           return {
             pseudo_id: p.pseudo_id,
@@ -210,7 +211,7 @@ export default function Leaderboard() {
                     justifyContent: 'center', border: `2px solid ${medal?.color}20`
                   }}>
                     <div style={{ fontSize: 22, fontWeight: 900, color: medal?.color }}>
-                      {filter === 'score' ? driver.score : filter === 'km' ? driver.km : driver.trajets}
+                      {filter === 'score' ? driver.score : filter === 'km' ? driver.km.toFixed(1) : driver.trajets}
                     </div>
                     <div style={{ fontSize: 10, color: '#94A3B8' }}>
                       {filter === 'score' ? '/100' : filter === 'km' ? 'km' : 'trajets'}
@@ -289,7 +290,7 @@ export default function Leaderboard() {
                   {/* Score */}
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 20, fontWeight: 900, color: filter === 'score' ? scoreColor : WAFA.noir }}>
-                      {filter === 'score' ? driver.score : filter === 'km' ? driver.km : driver.trajets}
+                      {filter === 'score' ? driver.score : filter === 'km' ? driver.km.toFixed(1) : driver.trajets}
                     </div>
                     <div style={{ fontSize: 10, color: '#94A3B8' }}>
                       {filter === 'score' ? '/100' : filter === 'km' ? 'km' : 'trajets'}
@@ -314,6 +315,26 @@ export default function Leaderboard() {
           Classement mis à jour en temps réel · DriveScore by Wafa Assurance
         </div>
       </div>
+    </div>
+
+      {/* BOTTOM NAV */}
+      <nav id="bottom-nav-leaderboard" style={{ position:'fixed', bottom:0, left:0, right:0, background:'white', borderTop:'0.5px solid #E2E8F0', display:'flex', zIndex:100, paddingBottom:'env(safe-area-inset-bottom)' }}>
+        {[
+          { icon:'🏠', label:'Accueil', path:'/dashboard' },
+          { icon:'🚗', label:'Télématique', path:'/telematics' },
+          { icon:'📋', label:'Trajets', path:'/trajets' },
+          { icon:'🏆', label:'Classement', path:'/leaderboard' },
+        ].map(item => {
+          const isActive = location.pathname === item.path
+          return (
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, padding:'10px 0', background:'none', border:'none', cursor:'pointer', color:isActive ? '#2E7D32' : '#94A3B8' }}>
+              <span style={{ fontSize:20 }}>{item.icon}</span>
+              <span style={{ fontSize:10, fontWeight:isActive ? 700 : 400 }}>{item.label}</span>
+              {isActive && <div style={{ width:4, height:4, borderRadius:'50%', background:'#2E7D32' }} />}
+            </button>
+          )
+        })}
+      </nav>
     </div>
   )
 }
