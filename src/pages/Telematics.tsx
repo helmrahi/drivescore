@@ -68,14 +68,19 @@ export default function Telematics() {
         {phase === "idle" && (
           <div style={{ textAlign:"center" }}>
             <div style={{ background:"white", borderRadius:24, padding:"48px 32px", boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:20 }}>
-              <div style={{ 
-                width:80, height:80, borderRadius:"50%", 
-                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:40, marginBottom:24, boxShadow:"0 8px 32px rgba(46,125,50,0.3)"
-              }}>🚗</div>
-              <h2 style={{ fontSize:24, fontWeight:900, color:WAFA.noir, margin:"0 0 8px", letterSpacing:"-0.5px" }}>Mode Télématique</h2>
-              <p style={{ color:"#64748B", fontSize:14, lineHeight:1.7, margin:"0 0 28px", maxWidth:280 }}>Votre téléphone détecte automatiquement votre trajet via GPS et accéléromètre.</p>
+              <div style={{ marginBottom:28 }}>
+                <div style={{ 
+                  width:96, height:96, borderRadius:"50%", 
+                  background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:48, margin:"0 auto 20px",
+                  boxShadow:"0 12px 40px rgba(46,125,50,0.25)"
+                }}>🚗</div>
+                <h2 style={{ fontSize:22, fontWeight:800, color:WAFA.noir, margin:"0 0 10px", letterSpacing:"-0.3px" }}>Mode Télématique</h2>
+                <p style={{ color:"#94A3B8", fontSize:13, lineHeight:1.6, margin:0 }}>
+                  GPS · Accéléromètre · Limites de vitesse
+                </p>
+              </div>
               <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:32, textAlign:"left" }}>
                 {[
                   { icon:"📍", text:"GPS trace votre itinéraire en temps réel" },
@@ -84,19 +89,14 @@ export default function Telematics() {
                   { icon:"📊", text:"Score calculé automatiquement" },
                 ].map((f,i) => (
                   <div key={i} style={{ 
-                    display:"flex", alignItems:"center", gap:14, 
-                    padding:"12px 16px", 
-                    background:"white", borderRadius:12,
-                    border:"1px solid #E8E8E8",
-                    boxShadow:"0 1px 4px rgba(0,0,0,0.04)"
+                    display:"flex", alignItems:"center", gap:12, 
+                    padding:"10px 14px", 
+                    background:i % 2 === 0 ? "#F8FAF8" : "white", 
+                    borderRadius:10,
+                    border:`1px solid ${WAFA.grisMid}`,
                   }}>
-                    <div style={{ 
-                      width:36, height:36, borderRadius:10,
-                      background:WAFA.gris,
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      fontSize:18, flexShrink:0
-                    }}>{f.icon}</div>
-                    <span style={{ fontSize:14, color:WAFA.noir, fontWeight:500 }}>{f.text}</span>
+                    <span style={{ fontSize:20, width:28, textAlign:"center", flexShrink:0 }}>{f.icon}</span>
+                    <span style={{ fontSize:13, color:"#475569", fontWeight:500 }}>{f.text}</span>
                   </div>
                 ))}
               </div>
