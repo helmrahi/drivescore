@@ -68,15 +68,15 @@ export default function Telematics() {
         {phase === "idle" && (
           <div style={{ textAlign:"center" }}>
             <div style={{ background:"white", borderRadius:24, padding:"48px 32px", boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:20 }}>
-              <div style={{ fontSize:64, marginBottom:20 }}>car</div>
+              <div style={{ fontSize:64, marginBottom:20 }}>🚗</div>
               <h2 style={{ fontSize:22, fontWeight:900, color:WAFA.noir, margin:"0 0 12px" }}>Telematique reelle</h2>
               <p style={{ color:"#64748B", fontSize:14, lineHeight:1.7, margin:"0 0 32px" }}>Votre telephone detecte automatiquement votre trajet.</p>
               <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:32, textAlign:"left" }}>
                 {[
-                  { icon:"GPS", text:"GPS trace votre itineraire en temps reel" },
-                  { icon:"ACC", text:"Accelerometre detecte les freinages" },
-                  { icon:"SPD", text:"Limite de vitesse OSM en temps reel" },
-                  { icon:"SCR", text:"Score calcule a la fin du trajet" },
+                  { icon:"📍", text:"GPS trace votre itinéraire en temps réel" },
+                  { icon:"⚡", text:"Accéléromètre détecte les freinages" },
+                  { icon:"🚦", text:"Limite de vitesse OSM en temps réel" },
+                  { icon:"📊", text:"Score calculé à la fin du trajet" },
                 ].map((f,i) => (
                   <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:WAFA.gris, borderRadius:10 }}>
                     <span style={{ fontSize:13, fontWeight:700, color:WAFA.vert }}>{f.icon}</span>
