@@ -198,7 +198,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
                 { label: 'Base', val: '200 MAD' },
-                { label: `${km} km × 0,50`, val: `${(km * 0.5).toFixed(0)} MAD` },
+                { label: `${Math.round(km)} km × 0,50`, val: `${(km * 0.5).toFixed(0)} MAD` },
                 { label: `Réduction -${reduction}%`, val: `-${Math.round(prime * reduction / 100)} MAD`, green: true },
               ].map((l, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: l.green ? WAFA.vert : '#64748B' }}>

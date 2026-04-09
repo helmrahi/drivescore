@@ -221,7 +221,8 @@ export default function Telematics() {
                   else conseils.push({ icon:"✅", text:"Excellente maîtrise du freinage ! Continuez à anticiper les ralentissements.", color:"#F0FDF4", border:"#86EFAC" })
                   if (accels > 5) conseils.push({ icon:"⚡", text:`${accels} accélérations brusques. Une conduite plus progressive économise du carburant.`, color:"#FEF2F2", border:"#FECACA" })
                   else conseils.push({ icon:"🌿", text:"Bonne gestion des accélérations. Votre conduite est économique.", color:"#F0FDF4", border:"#86EFAC" })
-                  if (score >= 90) conseils.push({ icon:"🏅", text:`Score ${score}/100 — Excellent ! Vous bénéficiez de la réduction maximale -15%.`, color:"#F0FDF4", border:"#86EFAC" })
+                  if (excessVitesse > 10) conseils.push({ icon:"🚨", text:`${excessVitesse} excès de vitesse détectés ! Respectez les limites pour améliorer votre score.`, color:"#FEF2F2", border:"#FECACA" })
+                  else if (score >= 90) conseils.push({ icon:"🏅", text:`Score ${score}/100 — Excellent ! Vous bénéficiez de la réduction maximale -15%.`, color:"#F0FDF4", border:"#86EFAC" })
                   else if (score >= 80) conseils.push({ icon:"📈", text:`Score ${score}/100 — Bon trajet ! Encore quelques points pour atteindre -15%.`, color:"#EFF6FF", border:"#BFDBFE" })
                   else conseils.push({ icon:"💪", text:`Score ${score}/100 — Réduisez vos freinages pour améliorer votre score et votre prime.`, color:"#FFFBEB", border:"#FDE68A" })
                   return conseils.map((c, i) => (
