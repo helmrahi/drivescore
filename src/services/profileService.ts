@@ -25,7 +25,7 @@ export async function updateProfile(userId: string, updates: Partial<Profile>): 
   return true
 }
 
-export async function getAllProfiles(): Promise<Profile[]> {
+export async function getAllProfiles(): Promise<any[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('pseudo_id, prenom, nom, afficher_leaderboard')

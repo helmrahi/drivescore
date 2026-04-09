@@ -38,7 +38,7 @@ export async function getTrajetStats(pseudoId: string): Promise<{
   return { totalKm, avgScore, totalTrajets: trajets.length, totalCout }
 }
 
-export async function getAllTrajets(): Promise<Trajet[]> {
+export async function getAllTrajets(): Promise<any[]> {
   const { data, error } = await supabase
     .from('trajets')
     .select('pseudo_id, score_trajet, km, type_route, freinages_brusques')

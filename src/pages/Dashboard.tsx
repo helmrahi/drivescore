@@ -1,271 +1,246 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useDashboard } from '../hooks/useDashboard'
-import { WAFA } from '../config/wafa'
-import { Badge, Trajet } from '../types'
+import { tokens } from '../design-system/tokens'
+import {
+  Card, MetricCard, ScoreGauge, Badge, Button,
+  Toggle, BottomNav, SectionHeader, EmptyState,
+  Loader, DS_GLOBAL_STYLES
+} from '../design-system/components'
+import { Trajet } from '../types'
 
-function calculerBadges(score: number, km: number, trajets: Trajet[]): Badge[] {
-  const result: Badge[] = []
+const t = tokens
+
+function calculerBadges(score: number, km: number, trajets: Trajet[]) {
+  const result = []
   const totalTrajets = trajets.length
-  const totalFreinages = trajets.reduce((s, t) => s + (t.freinages_brusques || 0), 0)
-  const avgFreinages = totalTrajets > 0 ? totalFreinages / totalTrajets : 0
-  const trajetsVille = trajets.filter(t => t.type_route === 'ville').length
+  const avgFreinages = totalTrajets > 0
+    ? trajets.reduce((s, tr) => s + (tr.freinages_brusques || 0), 0) / totalTrajets
+    : 0
+  const trajetsVille = trajets.filter(tr => tr.type_route === "ville").length
 
-  if (totalTrajets >= 50) result.push({ icon: '🚗', label: 'Grand conducteur', desc: '50 trajets effectués', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-  else if (totalTrajets >= 10) result.push({ icon: '🚗', label: 'Conducteur régulier', desc: '10 trajets effectués', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-  else if (totalTrajets >= 1) result.push({ icon: '🚗', label: 'Premier trajet', desc: 'Bienvenue sur DriveScore', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+  if (totalTrajets >= 50) result.push({ icon: "🚗", label: "Grand conducteur", desc: "50 trajets", level: "🥇 Or", color: t.color.gold[600], bg: t.color.gold[50] })
+  else if (totalTrajets >= 10) result.push({ icon: "🚗", label: "Conducteur régulier", desc: "10 trajets", level: "🥈 Argent", color: t.color.neutral[500], bg: t.color.neutral[100] })
+  else if (totalTrajets >= 1) result.push({ icon: "🚗", label: "Premier trajet", desc: "Bienvenue", level: "🥉 Bronze", color: "#D4891A", bg: "#FEF3C7" })
 
-  if (score >= 95) result.push({ icon: '🏅', label: 'Conducteur élite', desc: 'Score >= 95/100', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-  else if (score >= 85) result.push({ icon: '🏅', label: 'Bon conducteur', desc: 'Score >= 85/100', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-  else if (score >= 70) result.push({ icon: '🏅', label: 'En progression', desc: 'Score >= 70/100', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+  if (score >= 95) result.push({ icon: "🏅", label: "Conducteur élite", desc: "Score >= 95", level: "🥇 Or", color: t.color.gold[600], bg: t.color.gold[50] })
+  else if (score >= 85) result.push({ icon: "🏅", label: "Bon conducteur", desc: "Score >= 85", level: "🥈 Argent", color: t.color.neutral[500], bg: t.color.neutral[100] })
+  else if (score >= 70) result.push({ icon: "🏅", label: "En progression", desc: "Score >= 70", level: "🥉 Bronze", color: "#D4891A", bg: "#FEF3C7" })
 
-  if (km <= 100) result.push({ icon: '🌿', label: 'Éco champion', desc: '< 100 km ce mois', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-  else if (km <= 300) result.push({ icon: '🌿', label: 'Éco-driver', desc: '< 300 km ce mois', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-  else if (km <= 500) result.push({ icon: '🌿', label: 'Conducteur sobre', desc: '< 500 km ce mois', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+  if (km <= 100) result.push({ icon: "🌿", label: "Éco champion", desc: "< 100 km", level: "🥇 Or", color: t.color.gold[600], bg: t.color.gold[50] })
+  else if (km <= 300) result.push({ icon: "🌿", label: "Éco-driver", desc: "< 300 km", level: "🥈 Argent", color: t.color.neutral[500], bg: t.color.neutral[100] })
+  else if (km <= 500) result.push({ icon: "🌿", label: "Conducteur sobre", desc: "< 500 km", level: "🥉 Bronze", color: "#D4891A", bg: "#FEF3C7" })
 
-  if (totalTrajets >= 5 && avgFreinages === 0) result.push({ icon: '🛡️', label: 'Conduite parfaite', desc: '0 freinage sur 5 trajets', level: '🥇 Or', color: WAFA.vert, bg: '#F0FDF4' })
-  else if (avgFreinages < 2 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite douce', desc: '< 2 freinages/trajet', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-  else if (avgFreinages < 5 && totalTrajets > 0) result.push({ icon: '🛡️', label: 'Conduite sûre', desc: '< 5 freinages/trajet', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+  if (totalTrajets >= 5 && avgFreinages === 0) result.push({ icon: "🛡️", label: "Conduite parfaite", desc: "0 freinage", level: "🥇 Or", color: t.color.primary[500], bg: t.color.primary[50] })
+  else if (avgFreinages < 2 && totalTrajets > 0) result.push({ icon: "🛡️", label: "Conduite douce", desc: "< 2 freinages", level: "🥈 Argent", color: t.color.neutral[500], bg: t.color.neutral[100] })
+  else if (avgFreinages < 5 && totalTrajets > 0) result.push({ icon: "🛡️", label: "Conduite sûre", desc: "< 5 freinages", level: "🥉 Bronze", color: "#D4891A", bg: "#FEF3C7" })
 
-  if (trajetsVille >= 50) result.push({ icon: '🏙️', label: 'Maître urbain', desc: '50 trajets en ville', level: '🥇 Or', color: WAFA.orDark, bg: WAFA.orLight })
-  else if (trajetsVille >= 20) result.push({ icon: '🏙️', label: 'Citadin confirmé', desc: '20 trajets en ville', level: '🥈 Argent', color: '#64748B', bg: '#F1F5F9' })
-  else if (trajetsVille >= 5) result.push({ icon: '🏙️', label: 'Conducteur urbain', desc: '5 trajets en ville', level: '🥉 Bronze', color: '#D4891A', bg: '#FEF3C7' })
+  if (trajetsVille >= 20) result.push({ icon: "🏙️", label: "Citadin confirmé", desc: "20 trajets ville", level: "🥈 Argent", color: t.color.neutral[500], bg: t.color.neutral[100] })
+  else if (trajetsVille >= 5) result.push({ icon: "🏙️", label: "Conducteur urbain", desc: "5 trajets ville", level: "🥉 Bronze", color: "#D4891A", bg: "#FEF3C7" })
 
   return result
 }
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile, loading: authLoading, logout } = useAuth()
-  const { trajets, score, km, facture, loading: dataLoading, scoreColor, scoreLabel } = useDashboard(profile?.pseudo_id)
-  const isMobile = window.innerWidth < 640
+  const { trajets, score, km, facture, loading: dataLoading, scoreColor } = useDashboard(profile?.pseudo_id)
 
   const loading = authLoading || dataLoading
   const BADGES = calculerBadges(score, km, trajets)
-  const scoreBg = score >= 80 ? '#F0FDF4' : score >= 60 ? WAFA.orLight : '#FEF2F2'
 
   async function toggleLeaderboard(val: boolean) {
-    if (!profile) return
-    const { updateProfile } = await import('../services/profileService')
-    const { supabase } = await import('../lib/supabase')
+    const { updateProfile } = await import("../services/profileService")
+    const { supabase } = await import("../lib/supabase")
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await updateProfile(user.id, { afficher_leaderboard: val })
+    if (user) await updateProfile(user.id, { afficher_leaderboard: val })
   }
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: WAFA.gris }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 40, height: 40, border: `4px solid ${WAFA.vert}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-        <p style={{ color: '#94A3B8', fontSize: 14 }}>Chargement...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    </div>
-  )
+  if (loading) return <Loader text="Chargement de votre tableau de bord..." />
 
   return (
-    <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif' }}>
+    <>
+      <style>{DS_GLOBAL_STYLES}</style>
+      <div style={{ minHeight: "100vh", background: t.color.neutral[50], fontFamily: t.font.family.sans, paddingBottom: 80 }}>
 
-      {/* HEADER */}
-      <header style={{
-        background: 'white', borderBottom: `1px solid ${WAFA.grisMid}`,
-        padding: isMobile ? '0 12px' : '0 32px',
-        position: 'sticky', top: 0, zIndex: 50,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: isMobile ? 56 : 64
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <img src="/wafa-logo.png" alt="Wafa" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
-          <div>
-            <div style={{ fontWeight: 900, fontSize: 13, color: WAFA.noir, lineHeight: 1 }}>
-              WAFA <span style={{ color: WAFA.vert }}>ASSURANCE</span>
-            </div>
-            <div style={{ fontSize: 9, color: '#94A3B8', letterSpacing: '0.8px' }}>DRIVESCORE PAYD</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button onClick={() => navigate('/telematics')} style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color: 'white', border: 'none', borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🚗</button>
-          <button onClick={() => navigate('/leaderboard')} style={{ background: '#EFF6FF', border: '1.5px solid #3B82F6', color: '#1D4ED8', borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🏆</button>
-          <button onClick={() => navigate('/trajets')} style={{ background: WAFA.orLight, border: `1.5px solid ${WAFA.or}`, color: WAFA.orDark, borderRadius: 8, padding: '8px 10px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>+ Trajet</button>
-          <button onClick={logout} style={{ background: 'none', border: `1.5px solid ${WAFA.grisMid}`, color: '#EF4444', borderRadius: 8, padding: '7px 10px', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>⬅️</button>
-        </div>
-      </header>
-
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '12px' : '32px 20px' }}>
-
-        {/* GREETING */}
-        <div style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius: 16, padding: isMobile ? '16px' : '24px 28px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{ color: 'white', fontSize: isMobile ? 18 : 24, fontWeight: 900, margin: '0 0 4px' }}>
-              Bonjour {profile?.prenom} 👋
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, margin: 0 }}>
-              {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 10, padding: '8px 12px', textAlign: 'center', flexShrink: 0, marginLeft: 12 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 2 }}>FACTURE DU MOIS</div>
-            <div style={{ fontSize: isMobile ? 20 : 26, fontWeight: 900 }}>{facture?.total ?? 200} MAD</div>
-          </div>
-        </div>
-
-        {/* KPI CARDS */}
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
-          <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `4px solid ${scoreColor}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>SCORE CONDUITE</span>
-              <span>📊</span>
-            </div>
-            <div style={{ fontSize: 44, fontWeight: 900, color: scoreColor, lineHeight: 1, marginBottom: 4 }}>{score}</div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>points sur 100</div>
-            <div style={{ background: WAFA.grisMid, borderRadius: 8, height: 6, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ width: `${score}%`, height: '100%', background: scoreColor, borderRadius: 8 }} />
-            </div>
-            <div style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 20, background: scoreBg, color: scoreColor, fontSize: 11, fontWeight: 700 }}>{scoreLabel}</div>
-          </div>
-
-          <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: '4px solid #3B82F6' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>KM CE MOIS</span>
-              <span>🛣️</span>
-            </div>
-            <div style={{ fontSize: 44, fontWeight: 900, color: '#3B82F6', lineHeight: 1, marginBottom: 4 }}>{km}</div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>kilomètres parcourus</div>
-            <div style={{ background: '#EFF6FF', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 12, color: '#3B82F6', fontWeight: 600 }}>💡 {trajets.length} trajet{trajets.length > 1 ? 's' : ''} enregistré{trajets.length > 1 ? 's' : ''}</div>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderTop: `4px solid ${WAFA.or}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8' }}>FACTURE ESTIMÉE</span>
-              <span>💰</span>
-            </div>
-            <div style={{ fontSize: 44, fontWeight: 900, color: WAFA.orDark, lineHeight: 1, marginBottom: 4 }}>{facture?.total ?? 200}</div>
-            <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 10 }}>MAD ce mois</div>
-            <div style={{ background: WAFA.orLight, borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>200 + {km}×0,50 − {facture?.reduction ?? 0} MAD</div>
-            </div>
-          </div>
-        </div>
-
-        {/* BADGES + FACTURE */}
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: 16 }}>
-          <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🎖️ Mes badges</h2>
-              <span style={{ fontSize: 11, color: '#94A3B8', background: WAFA.gris, padding: '3px 10px', borderRadius: 20 }}>Ce mois</span>
-            </div>
-            {BADGES.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: 13 }}>
-                Faites des trajets pour débloquer des badges
+        {/* HEADER */}
+        <header style={{
+          background: "#fff",
+          borderBottom: `0.5px solid ${t.color.neutral[200]}`,
+          padding: `0 ${t.space[4]}`,
+          position: "sticky", top: 0, zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          height: 56,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: t.space[2] }}>
+            <img src="/wafa-logo.png" alt="Wafa" style={{ width: 28, height: 28, borderRadius: t.radius.md, objectFit: "cover" }} />
+            <div>
+              <div style={{ fontWeight: t.font.weight.black, fontSize: t.font.size.sm, color: t.color.neutral[900], lineHeight: 1 }}>
+                WAFA <span style={{ color: t.color.primary[500] }}>ASSURANCE</span>
               </div>
+              <div style={{ fontSize: t.font.size.xs, color: t.color.neutral[400], letterSpacing: "0.06em" }}>DRIVESCORE PAYD</div>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={logout}>⬅️ Déconnexion</Button>
+        </header>
+
+        <div style={{ maxWidth: 480, margin: "0 auto", padding: t.space[4] }}>
+
+          {/* GREETING + FACTURE */}
+          <div style={{
+            background: `linear-gradient(135deg, ${t.color.primary[600]}, ${t.color.primary[500]})`,
+            borderRadius: t.radius["3xl"], padding: t.space[5], marginBottom: t.space[4],
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <div>
+              <h1 style={{ color: "#fff", fontSize: t.font.size.xl, fontWeight: t.font.weight.black, margin: `0 0 ${t.space[1]}` }}>
+                Bonjour {profile?.prenom} 👋
+              </h1>
+              <p style={{ color: "rgba(255,255,255,0.65)", fontSize: t.font.size.sm, margin: 0 }}>
+                {new Date().toLocaleString("fr-FR", { month: "long", year: "numeric" })}
+              </p>
+            </div>
+            <div style={{ background: t.color.gold[500], color: t.color.neutral[900], borderRadius: t.radius.xl, padding: `${t.space[3]} ${t.space[4]}`, textAlign: "center", flexShrink: 0 }}>
+              <div style={{ fontSize: t.font.size.xs, fontWeight: t.font.weight.bold, marginBottom: 2, letterSpacing: "0.05em" }}>FACTURE</div>
+              <div style={{ fontSize: t.font.size["2xl"], fontWeight: t.font.weight.black }}>{facture?.total ?? 200} MAD</div>
+            </div>
+          </div>
+
+          {/* SCORE + KPIs */}
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: t.space[3], marginBottom: t.space[4], alignItems: "center" }}>
+            <Card padding={t.space[4]}>
+              <ScoreGauge score={score} size="md" showLabel />
+            </Card>
+            <div style={{ display: "flex", flexDirection: "column", gap: t.space[3] }}>
+              <MetricCard label="Km ce mois" value={km} unit="km" accent={t.color.info.solid} icon="🛣️" sub={`${trajets.length} trajet${trajets.length > 1 ? "s" : ""}`} />
+              <MetricCard label="Facture estimée" value={facture?.total ?? 200} unit="MAD" accent={t.color.gold[500]} icon="💰" sub={`Réduction : -${facture?.reduction ?? 0} MAD`} />
+            </div>
+          </div>
+
+          {/* TRAJETS */}
+          <Card padding={t.space[5]} >
+            <SectionHeader
+              title="🗺️ Derniers trajets"
+              action={{ label: "+ Nouveau", onClick: () => navigate("/trajets") }}
+            />
+            {trajets.length === 0 ? (
+              <EmptyState
+                icon="🛣️"
+                title="Aucun trajet ce mois"
+                description="Commencez à conduire pour voir vos données"
+                action={{ label: "Déclarer un trajet", onClick: () => navigate("/trajets") }}
+              />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {BADGES.map((b, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: b.bg, borderRadius: 10, border: `1px solid ${b.color}20` }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}>{b.icon}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: b.color }}>{b.label}</div>
-                      <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>{b.desc}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: t.space[2] }}>
+                {trajets.map((tr, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: `${t.space[3]} ${t.space[4]}`,
+                    background: t.color.neutral[50],
+                    borderRadius: t.radius.lg,
+                    border: `0.5px solid ${t.color.neutral[200]}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: t.space[3] }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: t.radius.md, flexShrink: 0,
+                        background: tr.type_route === "ville" ? t.color.info.bg : tr.type_route === "autoroute" ? t.color.primary[50] : t.color.gold[50],
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+                      }}>
+                        {tr.type_route === "ville" ? "🏙️" : tr.type_route === "autoroute" ? "🚀" : "🛣️"}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: t.font.weight.semibold, fontSize: t.font.size.sm, color: t.color.neutral[800] }}>
+                          {tr.ville_depart && tr.ville_arrivee ? `${tr.ville_depart} → ${tr.ville_arrivee}` : tr.date_trajet}
+                        </div>
+                        <div style={{ fontSize: t.font.size.xs, color: t.color.neutral[400] }}>{tr.km} km · {tr.type_route}</div>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: b.color, background: 'white', padding: '3px 8px', borderRadius: 20, border: `1px solid ${b.color}30`, whiteSpace: 'nowrap' }}>{b.level}</div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <Badge variant={tr.score_trajet >= 80 ? "success" : tr.score_trajet >= 60 ? "warning" : "danger"}>
+                        {tr.score_trajet}/100
+                      </Badge>
+                      <div style={{ fontSize: t.font.size.xs, color: t.color.gold[600], fontWeight: t.font.weight.semibold, marginTop: 3 }}>{tr.cout_mad} MAD</div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", padding: `${t.space[3]} ${t.space[4]}`, background: t.color.gold[50], borderRadius: t.radius.lg, marginTop: t.space[1] }}>
+                  <span style={{ fontSize: t.font.size.sm, fontWeight: t.font.weight.semibold, color: t.color.gold[700] }}>Total ({trajets.length} trajets)</span>
+                  <span style={{ fontSize: t.font.size.base, fontWeight: t.font.weight.black, color: t.color.gold[600] }}>{trajets.reduce((s, tr) => s + (tr.cout_mad || 0), 0).toFixed(1)} MAD</span>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* BADGES */}
+          {BADGES.length > 0 && (
+            <Card padding={t.space[5]} >
+              <SectionHeader title="🎖️ Mes badges" badge="Ce mois" />
+              <div style={{ display: "flex", flexDirection: "column", gap: t.space[2] }}>
+                {BADGES.map((b, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: t.space[3], padding: `${t.space[3]} ${t.space[4]}`, background: b.bg, borderRadius: t.radius.lg }}>
+                    <div style={{ width: 36, height: 36, borderRadius: t.radius.md, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, boxShadow: t.shadow.sm }}>{b.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: t.font.weight.semibold, fontSize: t.font.size.sm, color: b.color }}>{b.label}</div>
+                      <div style={{ fontSize: t.font.size.xs, color: t.color.neutral[400] }}>{b.desc}</div>
+                    </div>
+                    <Badge variant="neutral">{b.level}</Badge>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </Card>
+          )}
 
-          <div style={{ flex: 1, background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>💰 Détail facture</h2>
-              <span style={{ fontSize: 11, color: WAFA.vert, background: '#F0FDF4', padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>
-                {new Date().toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}
-              </span>
-            </div>
+          {/* DÉTAIL FACTURE */}
+          <Card padding={t.space[5]} >
+            <SectionHeader
+              title="💰 Détail facture"
+              badge={new Date().toLocaleString("fr-FR", { month: "long", year: "numeric" })}
+            />
             {[
-              { label: 'Abonnement de base', val: '200,00 MAD', color: WAFA.noir },
-              { label: `${km} km × 0,50 MAD/km`, val: `${(km * 0.5).toFixed(2)} MAD`, color: WAFA.noir },
-              { label: `Réduction score (${score}/100)`, val: `-${facture?.reduction ?? 0},00 MAD`, color: WAFA.vert },
+              { label: "Abonnement de base", val: "200,00 MAD", color: t.color.neutral[800] },
+              { label: `${km} km × 0,50 MAD/km`, val: `${(km * 0.5).toFixed(2)} MAD`, color: t.color.neutral[800] },
+              { label: `Réduction score (${score}/100)`, val: `-${facture?.reduction ?? 0},00 MAD`, color: t.color.primary[500] },
             ].map((l, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${WAFA.grisMid}` }}>
-                <span style={{ fontSize: 12, color: '#64748B', flex: 1, paddingRight: 8 }}>{l.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: l.color, flexShrink: 0 }}>{l.val}</span>
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: `${t.space[3]} 0`, borderBottom: `0.5px solid ${t.color.neutral[100]}` }}>
+                <span style={{ fontSize: t.font.size.sm, color: t.color.neutral[500], flex: 1 }}>{l.label}</span>
+                <span style={{ fontSize: t.font.size.sm, fontWeight: t.font.weight.bold, color: l.color }}>{l.val}</span>
               </div>
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, padding: '12px 14px', background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius: 10 }}>
-              <span style={{ fontWeight: 800, color: 'white', fontSize: 13 }}>TOTAL</span>
-              <span style={{ fontWeight: 900, fontSize: 20, color: WAFA.or }}>{facture?.total ?? 200} MAD</span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: t.space[3], padding: `${t.space[3]} ${t.space[4]}`, background: `linear-gradient(135deg, ${t.color.primary[600]}, ${t.color.primary[500]})`, borderRadius: t.radius.lg }}>
+              <span style={{ fontWeight: t.font.weight.bold, color: "#fff", fontSize: t.font.size.base }}>TOTAL CE MOIS</span>
+              <span style={{ fontWeight: t.font.weight.black, fontSize: t.font.size.xl, color: t.color.gold[400] }}>{facture?.total ?? 200} MAD</span>
             </div>
+          </Card>
+
+          {/* TOGGLE LEADERBOARD */}
+          <Card padding={t.space[5]} >
+            <Toggle
+              checked={profile?.afficher_leaderboard ?? false}
+              onChange={toggleLeaderboard}
+              label="🏆 Apparaître dans le classement"
+              description="Votre score sera visible par les autres conducteurs"
+            />
+          </Card>
+
+          {/* FOOTER */}
+          <div style={{ textAlign: "center", padding: `${t.space[4]} 0`, color: t.color.neutral[400], fontSize: t.font.size.xs }}>
+            Wafa Assurance · Agréé ACAPS · Conforme CNDP · © 2026
           </div>
         </div>
 
-        {/* TRAJETS */}
-        <div style={{ background: 'white', borderRadius: 16, padding: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 800, color: WAFA.noir, margin: 0 }}>🗺️ Derniers trajets</h2>
-            <button onClick={() => navigate('/trajets')} style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color: 'white', border: 'none', borderRadius: 8, padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>+ Nouveau</button>
-          </div>
-
-          {trajets.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#94A3B8', fontSize: 14 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🛣️</div>
-              Aucun trajet enregistré — commencez à conduire !
-            </div>
-          ) : (
-            trajets.map((t, i) => (
-              <div key={i} style={{ padding: '12px', borderRadius: 12, marginBottom: 8, background: WAFA.gris, border: `1px solid ${WAFA.grisMid}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: t.type_route === 'ville' ? '#EFF6FF' : t.type_route === 'autoroute' ? '#F0FDF4' : WAFA.orLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-                      {t.type_route === 'ville' ? '🏙️' : t.type_route === 'autoroute' ? '🚀' : '🛣️'}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir }}>
-                        {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : t.date_trajet}
-                      </div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km · {t.type_route}</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: t.score_trajet >= 90 ? WAFA.vert : t.score_trajet >= 75 ? WAFA.orDark : '#EF4444' }}>{t.score_trajet}/100</div>
-                    <div style={{ fontSize: 12, color: WAFA.orDark, fontWeight: 700 }}>{t.cout_mad} MAD</div>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-
-          {trajets.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: WAFA.orLight, borderRadius: 10, marginTop: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.orDark }}>Total ({trajets.length} trajets)</span>
-              <span style={{ fontSize: 15, fontWeight: 900, color: WAFA.orDark }}>{trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(1)} MAD</span>
-            </div>
-          )}
-        </div>
-
-        {/* TOGGLE LEADERBOARD */}
-        <div style={{ background: 'white', borderRadius: 16, padding: '16px 18px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir, marginBottom: 2 }}>🏆 Apparaître dans le classement</div>
-            <div style={{ fontSize: 11, color: '#94A3B8' }}>Votre score sera visible par les autres conducteurs</div>
-          </div>
-          <div onClick={() => toggleLeaderboard(!(profile?.afficher_leaderboard))} style={{ width: 48, height: 26, borderRadius: 13, cursor: 'pointer', background: profile?.afficher_leaderboard ? WAFA.vert : WAFA.grisMid, position: 'relative', transition: 'background 0.3s', flexShrink: 0 }}>
-            <div style={{ position: 'absolute', top: 3, left: profile?.afficher_leaderboard ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.3s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
-          </div>
-        </div>
-
-        {/* FOOTER */}
-        <div style={{ padding: '12px 16px', background: WAFA.orLight, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <img src="/wafa-logo.png" alt="Wafa" style={{ width: 24, height: 24, borderRadius: 4 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: WAFA.vertDark }}>Wafa Assurance · Agréé ACAPS</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {['🔐 CNDP', '🇪🇺 Europe', '✅ ACAPS'].map((tag, i) => (
-              <span key={i} style={{ fontSize: 10, fontWeight: 600, color: WAFA.vert, background: '#F0FDF4', padding: '2px 8px', borderRadius: 20 }}>{tag}</span>
-            ))}
-          </div>
-        </div>
+        {/* BOTTOM NAV */}
+        <BottomNav
+          items={[
+            { icon: "🏠", label: "Accueil", path: "/dashboard" },
+            { icon: "🚗", label: "Télématique", path: "/telematics" },
+            { icon: "📋", label: "Trajets", path: "/trajets" },
+            { icon: "🏆", label: "Classement", path: "/leaderboard" },
+          ]}
+          active={location.pathname}
+          onNavigate={navigate}
+        />
       </div>
-    </div>
+    </>
   )
 }

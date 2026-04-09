@@ -51,7 +51,7 @@ export default function Telematics() {
     <div style={{ minHeight:"100vh", background:WAFA.gris, fontFamily:"Inter,sans-serif" }}>
       <header style={{ background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding:"16px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <button onClick={() => navigate("/dashboard")} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontWeight:600, fontSize:13 }}>
-          <- Tableau de bord
+          ← Tableau de bord
         </button>
         <div style={{ textAlign:"center" }}>
           <div style={{ color:"white", fontWeight:800, fontSize:16 }}>Mode Telematique</div>
