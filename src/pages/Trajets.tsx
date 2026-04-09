@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -15,6 +15,61 @@ function getScoreColor(s: number) {
   return '#DC2626'
 }
 
+function getScoreBg(s: number) {
+  if (s >= 90) return '#F0FDF4'
+  if (s >= 80) return '#DCFCE7'
+  if (s >= 70) return '#FEF3C7'
+  return '#FEF2F2'
+}
+
+function MiniMap({ trajet }: { trajet: any }) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstance = useRef<any>(null)
+
+  useEffect(() => {
+    if (!mapRef.current) return
+    if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null }
+
+    import('leaflet').then(L => {
+      delete (L.Icon.Default.prototype as any)._getIconUrl
+      const map = L.map(mapRef.current!, {
+        zoomControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        touchZoom: false,
+        attributionControl: false,
+      })
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
+
+      if (trajet.gps_points && trajet.gps_points.length > 1) {
+        const latlngs = trajet.gps_points.map((p: any) => [p.lat, p.lng])
+        L.polyline(latlngs, { color: WAFA.vert, weight: 3, opacity: 0.8 }).addTo(map)
+        map.fitBounds(latlngs, { padding: [8, 8] })
+
+        const startIcon = L.divIcon({ html: '<div style="background:#2E7D32;width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>', className: '', iconSize: [10, 10], iconAnchor: [5, 5] })
+        const endIcon = L.divIcon({ html: '<div style="background:#DC2626;width:10px;height:10px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>', className: '', iconSize: [10, 10], iconAnchor: [5, 5] })
+        L.marker(latlngs[0], { icon: startIcon }).addTo(map)
+        L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(map)
+      } else {
+        map.setView([33.5731, -7.5898], 12)
+      }
+
+      mapInstance.current = map
+    })
+
+    return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null } }
+  }, [])
+
+  return (
+    <>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+      <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
+    </>
+  )
+}
+
 export default function Trajets() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -23,6 +78,7 @@ export default function Trajets() {
   const [success, setSuccess] = useState(false)
   const [trajets, setTrajets] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [selectedTrajet, setSelectedTrajet] = useState<any>(null)
 
   const score = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 5 - (form.conduite_nocturne ? 5 : 0))
 
@@ -66,17 +122,29 @@ export default function Trajets() {
     setLoading(false)
   }
 
-  const totalKm = trajets.reduce((s, t) => s + (t.km || 0), 0)
+  const totalKm = parseFloat(trajets.reduce((s, t) => s + (t.km || 0), 0).toFixed(2))
   const avgScore = trajets.length > 0 ? Math.round(trajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajets.length) : 0
-  const totalCout = trajets.reduce((s, t) => s + (t.cout_mad || 0), 0)
+  const totalCout = parseFloat(trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(2))
+
+  const formatDate = (d: string) => {
+    const date = new Date(d)
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  }
+
+  const formatDuration = (t: any) => {
+    if (!t.vitesse_moyenne || t.vitesse_moyenne === 0 || !t.km) return null
+    const mins = Math.round((t.km / t.vitesse_moyenne) * 60)
+    if (mins < 60) return `${mins} min`
+    return `${Math.floor(mins/60)}h${mins%60 > 0 ? mins%60 : ''}` 
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
 
       {/* HEADER */}
       <header style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>📋 Mes trajets</div>
-        <button onClick={() => setShowForm(!showForm)} style={{ background: WAFA.or, border: 'none', color: WAFA.noir, borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+        <div style={{ color: 'white', fontWeight: 800, fontSize: 17 }}>📋 Mes Trajets</div>
+        <button onClick={() => setShowForm(!showForm)} style={{ background: WAFA.or, border: 'none', color: WAFA.noir, borderRadius: 10, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
           {showForm ? '✕ Fermer' : '+ Déclarer'}
         </button>
       </header>
@@ -89,12 +157,12 @@ export default function Trajets() {
           </div>
         )}
 
-        {/* STATS GLOBALES */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+        {/* STATS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
           {[
             { label: 'Total km', value: `${totalKm}`, unit: 'km', color: '#3B82F6' },
             { label: 'Score moy.', value: `${avgScore}`, unit: '/100', color: getScoreColor(avgScore) },
-            { label: 'Coût total', value: `${totalCout.toFixed(0)}`, unit: 'MAD', color: WAFA.orDark },
+            { label: 'Coût total', value: `${totalCout}`, unit: 'MAD', color: WAFA.orDark },
           ].map((s, i) => (
             <div key={i} style={{ background: 'white', borderRadius: 12, padding: '10px 12px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}<span style={{ fontSize: 10 }}> {s.unit}</span></div>
@@ -105,13 +173,18 @@ export default function Trajets() {
 
         {/* FORMULAIRE */}
         {showForm && (
-          <div style={{ background: 'white', borderRadius: 16, padding: '16px', marginBottom: 12, border: `0.5px solid ${WAFA.grisMid}` }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: WAFA.noir, marginBottom: 14 }}>📍 Nouveau trajet</div>
-
-            {/* Score preview */}
-            <div style={{ background: `${getScoreColor(score)}18`, borderRadius: 12, padding: '10px', textAlign: 'center', marginBottom: 14, border: `1px solid ${getScoreColor(score)}40` }}>
-              <div style={{ fontSize: 28, fontWeight: 900, color: getScoreColor(score) }}>{score}<span style={{ fontSize: 12 }}>/100</span></div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>Score estimé</div>
+          <div style={{ background: 'white', borderRadius: 16, padding: '16px', marginBottom: 14, border: `0.5px solid ${WAFA.grisMid}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 1, background: getScoreBg(score), borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 900, color: getScoreColor(score) }}>{score}<span style={{ fontSize: 12 }}>/100</span></div>
+                <div style={{ fontSize: 10, color: '#64748B' }}>Score estimé</div>
+              </div>
+              {form.km && (
+                <div style={{ flex: 1, background: WAFA.orLight, borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: WAFA.orDark }}>{(parseFloat(form.km||'0') * 0.5).toFixed(2)}</div>
+                  <div style={{ fontSize: 10, color: '#64748B' }}>MAD estimé</div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={soumettre} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -123,7 +196,7 @@ export default function Trajets() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6, letterSpacing: '0.05em' }}>TYPE DE ROUTE</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>TYPE DE ROUTE</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
                   {[{ id: 'ville', label: '🏙️ Ville' }, { id: 'route', label: '🛣️ Route' }, { id: 'autoroute', label: '🚀 Auto' }, { id: 'mixte', label: '🔀 Mixte' }].map(t => (
                     <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, type_route: t.id }))}
@@ -151,7 +224,7 @@ export default function Trajets() {
 
               <div style={{ background: '#FFF7ED', borderRadius: 12, padding: '12px 14px' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: WAFA.orDark, marginBottom: 10 }}>⚠️ Incidents</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { label: '🛑 Freinages brusques', key: 'freinages_brusques', pts: -3 },
                     { label: '🚨 Excès de vitesse', key: 'exces_vitesse_count', pts: -5 },
@@ -181,53 +254,107 @@ export default function Trajets() {
           </div>
         )}
 
-        {/* HISTORIQUE */}
-        <div style={{ background: 'white', borderRadius: 16, border: `0.5px solid ${WAFA.grisMid}`, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: `0.5px solid ${WAFA.grisMid}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: WAFA.noir }}>Historique</span>
-            <span style={{ fontSize: 11, color: '#94A3B8' }}>{trajets.length} trajet{trajets.length > 1 ? 's' : ''}</span>
+        {/* LISTE TRAJETS — style premium */}
+        {trajets.length === 0 ? (
+          <div style={{ background: 'white', borderRadius: 16, padding: '40px 16px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🛣️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: WAFA.noir, marginBottom: 6 }}>Aucun trajet</div>
+            <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20 }}>Démarrez votre premier trajet</div>
+            <button onClick={() => navigate('/telematics')} style={{ background: WAFA.vert, color: 'white', border: 'none', borderRadius: 10, padding: '12px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+              🚗 Lancer la télématique
+            </button>
           </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {trajets.map((t, i) => (
+              <div key={i}
+                onClick={() => setSelectedTrajet(selectedTrajet?.id === t.id ? null : t)}
+                style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: `0.5px solid ${WAFA.grisMid}`, cursor: 'pointer', transition: 'all 0.2s' }}>
 
-          {trajets.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🛣️</div>
-              <div style={{ fontSize: 14 }}>Aucun trajet enregistré</div>
-            </div>
-          ) : (
-            trajets.map((t, i) => (
-              <div key={i} style={{ padding: '12px 16px', borderBottom: i < trajets.length - 1 ? `0.5px solid ${WAFA.grisMid}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                {/* Icône type */}
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: t.type_route === 'ville' ? '#EFF6FF' : t.type_route === 'autoroute' ? '#F0FDF4' : WAFA.orLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                  {t.type_route === 'ville' ? '🏙️' : t.type_route === 'autoroute' ? '🚀' : '🛣️'}
+                {/* MINIATURE CARTE */}
+                <div style={{ height: 100, background: '#E8F4E8', position: 'relative' }}>
+                  <MiniMap trajet={t} />
+                  {/* Overlay score */}
+                  <div style={{ position: 'absolute', top: 8, right: 8, background: getScoreColor(t.score_trajet), color: 'white', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}>
+                    {t.score_trajet}/100
+                  </div>
+                  {/* Type route badge */}
+                  <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(255,255,255,0.9)', borderRadius: 20, padding: '3px 8px', fontSize: 11, fontWeight: 600, color: WAFA.noir }}>
+                    {t.type_route === 'ville' ? '🏙️' : t.type_route === 'autoroute' ? '🚀' : '🛣️'} {t.type_route}
+                  </div>
                 </div>
 
-                {/* Infos */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir, marginBottom: 2 }}>
-                    {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : `Trajet ${t.type_route}`}
+                {/* INFOS TRAJET */}
+                <div style={{ padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir, marginBottom: 2 }}>
+                        {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : `Trajet ${t.type_route}`}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{formatDate(t.date_trajet)}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: WAFA.orDark }}>{t.cout_mad} MAD</div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km</span>
-                    <span style={{ fontSize: 11, color: '#94A3B8' }}>·</span>
-                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{t.date_trajet}</span>
-                    {t.freinages_brusques > 0 && (
-                      <span style={{ fontSize: 10, background: '#FEF2F2', color: '#DC2626', padding: '1px 6px', borderRadius: 20 }}>🛑 {t.freinages_brusques}</span>
-                    )}
+
+                  {/* KPIs inline */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ background: WAFA.gris, borderRadius: 20, padding: '3px 8px', fontSize: 11, color: '#475569', fontWeight: 500 }}>
+                      🛣️ {t.km} km
+                    </span>
                     {t.vitesse_max > 0 && (
-                      <span style={{ fontSize: 10, background: '#EFF6FF', color: '#1D4ED8', padding: '1px 6px', borderRadius: 20 }}>⚡ {t.vitesse_max} km/h</span>
+                      <span style={{ background: '#EFF6FF', borderRadius: 20, padding: '3px 8px', fontSize: 11, color: '#1D4ED8', fontWeight: 500 }}>
+                        ⚡ {t.vitesse_max} km/h max
+                      </span>
+                    )}
+                    {t.freinages_brusques > 0 && (
+                      <span style={{ background: '#FEF2F2', borderRadius: 20, padding: '3px 8px', fontSize: 11, color: '#DC2626', fontWeight: 500 }}>
+                        🛑 {t.freinages_brusques} freinage{t.freinages_brusques > 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {t.conduite_nocturne && (
+                      <span style={{ background: '#F3F4F6', borderRadius: 20, padding: '3px 8px', fontSize: 11, color: '#374151', fontWeight: 500 }}>
+                        🌙 Nocturne
+                      </span>
+                    )}
+                    {formatDuration(t) && (
+                      <span style={{ background: WAFA.gris, borderRadius: 20, padding: '3px 8px', fontSize: 11, color: '#475569', fontWeight: 500 }}>
+                        ⏱️ {formatDuration(t)}
+                      </span>
                     )}
                   </div>
-                </div>
 
-                {/* Score + Coût */}
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: getScoreColor(t.score_trajet) }}>{t.score_trajet}/100</div>
-                  <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>{t.cout_mad} MAD</div>
+                  {/* DÉTAIL ÉTENDU */}
+                  {selectedTrajet?.id === t.id && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${WAFA.grisMid}` }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                        <div style={{ background: getScoreBg(t.score_trajet), borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 24, fontWeight: 900, color: getScoreColor(t.score_trajet) }}>{t.score_trajet}/100</div>
+                          <div style={{ fontSize: 10, color: '#64748B' }}>Score final</div>
+                        </div>
+                        <div style={{ background: WAFA.orLight, borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 24, fontWeight: 900, color: WAFA.orDark }}>{t.cout_mad} MAD</div>
+                          <div style={{ fontSize: 10, color: '#64748B' }}>Coût trajet</div>
+                        </div>
+                      </div>
+                      {/* Coaching mini */}
+                      <div style={{ background: WAFA.gris, borderRadius: 10, padding: '10px 12px', borderLeft: `3px solid ${getScoreColor(t.score_trajet)}` }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: getScoreColor(t.score_trajet), marginBottom: 3 }}>💡 Analyse</div>
+                        <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
+                          {t.freinages_brusques > 3 ? `${t.freinages_brusques} freinages brusques — anticipez davantage les ralentissements.`
+                            : t.score_trajet >= 90 ? 'Excellent trajet ! Continuez sur cette lancée.'
+                            : t.vitesse_max > 110 ? `Vitesse max ${t.vitesse_max} km/h — respectez les limites.`
+                            : 'Bonne conduite. Maintenez cette régularité.'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* BOTTOM NAV */}
