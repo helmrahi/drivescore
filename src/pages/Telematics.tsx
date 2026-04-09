@@ -68,24 +68,46 @@ export default function Telematics() {
         {phase === "idle" && (
           <div style={{ textAlign:"center" }}>
             <div style={{ background:"white", borderRadius:24, padding:"48px 32px", boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:20 }}>
-              <div style={{ fontSize:64, marginBottom:20 }}>🚗</div>
-              <h2 style={{ fontSize:22, fontWeight:900, color:WAFA.noir, margin:"0 0 12px" }}>Telematique reelle</h2>
-              <p style={{ color:"#64748B", fontSize:14, lineHeight:1.7, margin:"0 0 32px" }}>Votre telephone detecte automatiquement votre trajet.</p>
+              <div style={{ 
+                width:80, height:80, borderRadius:"50%", 
+                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:40, marginBottom:24, boxShadow:"0 8px 32px rgba(46,125,50,0.3)"
+              }}>🚗</div>
+              <h2 style={{ fontSize:24, fontWeight:900, color:WAFA.noir, margin:"0 0 8px", letterSpacing:"-0.5px" }}>Mode Télématique</h2>
+              <p style={{ color:"#64748B", fontSize:14, lineHeight:1.7, margin:"0 0 28px", maxWidth:280 }}>Votre téléphone détecte automatiquement votre trajet via GPS et accéléromètre.</p>
               <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:32, textAlign:"left" }}>
                 {[
                   { icon:"📍", text:"GPS trace votre itinéraire en temps réel" },
                   { icon:"⚡", text:"Accéléromètre détecte les freinages" },
-                  { icon:"🚦", text:"Limite de vitesse OSM en temps réel" },
-                  { icon:"📊", text:"Score calculé à la fin du trajet" },
+                  { icon:"🚦", text:"Détection limite de vitesse en temps réel" },
+                  { icon:"📊", text:"Score calculé automatiquement" },
                 ].map((f,i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:WAFA.gris, borderRadius:10 }}>
-                    <span style={{ fontSize:13, fontWeight:700, color:WAFA.vert }}>{f.icon}</span>
-                    <span style={{ fontSize:13, color:WAFA.noir, fontWeight:500 }}>{f.text}</span>
+                  <div key={i} style={{ 
+                    display:"flex", alignItems:"center", gap:14, 
+                    padding:"12px 16px", 
+                    background:"white", borderRadius:12,
+                    border:"1px solid #E8E8E8",
+                    boxShadow:"0 1px 4px rgba(0,0,0,0.04)"
+                  }}>
+                    <div style={{ 
+                      width:36, height:36, borderRadius:10,
+                      background:WAFA.gris,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontSize:18, flexShrink:0
+                    }}>{f.icon}</div>
+                    <span style={{ fontSize:14, color:WAFA.noir, fontWeight:500 }}>{f.text}</span>
                   </div>
                 ))}
               </div>
-              <button onClick={startTrajet} style={{ width:"100%", padding:"18px", borderRadius:16, background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color:"white", border:"none", fontWeight:900, fontSize:18, cursor:"pointer" }}>
-                Demarrer le trajet
+              <button onClick={startTrajet} style={{ 
+                width:"100%", padding:"18px", borderRadius:16, 
+                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, 
+                color:"white", border:"none", fontWeight:800, fontSize:16, 
+                cursor:"pointer", letterSpacing:"0.3px",
+                boxShadow:"0 8px 24px rgba(46,125,50,0.4)"
+              }}>
+                🚀 Démarrer le trajet
               </button>
             </div>
           </div>
