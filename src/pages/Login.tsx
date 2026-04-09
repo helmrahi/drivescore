@@ -140,7 +140,14 @@ export default function Login() {
                 <span style={{fontSize:12,color:'#94A3B8'}}>Nouveau sur DriveScore ?</span>
                 <div style={{flex:1,height:1,background:WAFA.grisMid}} />
               </div>
-              <Link to="/inscription" style={{textDecoration:'none'}}>
+              <button onClick={() => navigate('/simulateur')} style={{
+              width:'100%', padding:'13px', borderRadius:14, marginBottom:10,
+              background:'transparent', border:`1.5px solid ${WAFA.vert}`,
+              color:WAFA.vert, fontWeight:700, fontSize:14, cursor:'pointer'
+            }}>
+              💡 Simuler ma prime avant de m'inscrire
+            </button>
+            <Link to="/inscription" style={{textDecoration:'none'}}>
                 <div style={{padding:'15px',borderRadius:14,border:`2px solid ${WAFA.or}`,background:WAFA.orLight,textAlign:'center',color:WAFA.vertDark,fontWeight:800,fontSize:14}}>
                   ✨ Créer mon compte gratuitement
                 </div>
