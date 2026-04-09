@@ -21,7 +21,7 @@ export function useDashboard(pseudoId: string | undefined) {
     async function load() {
       const data = await getTrajets(pseudoId!, 10)
       if (data.length > 0) {
-        const totalKm = data.reduce((s, t) => s + (t.km || 0), 0)
+        const totalKm = parseFloat(data.reduce((s, t) => s + (t.km || 0), 0).toFixed(2))
         const avgScore = Math.round(data.reduce((s, t) => s + (t.score_trajet || 0), 0) / data.length)
         setKm(totalKm)
         setScore(avgScore)

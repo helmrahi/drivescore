@@ -132,7 +132,7 @@ export default function Dashboard() {
           {/* KPIs rapides */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             {[
-              { label: 'Km', value: km, unit: 'km', color: '#3B82F6' },
+              { label: 'Km', value: km.toFixed(2), unit: 'km', color: '#3B82F6' },
               { label: 'Économie', value: Math.max(0, economie), unit: 'MAD', color: '#16A34A' },
               { label: 'Trajets', value: trajets.length, unit: '', color: WAFA.orDark },
             ].map((k, i) => (
@@ -198,7 +198,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
                 { label: 'Base', val: '200 MAD' },
-                { label: `${Math.round(km)} km × 0,50`, val: `${(km * 0.5).toFixed(0)} MAD` },
+                { label: `${Math.round(km)} km × 0,50`, val: `${(km * 0.5).toFixed(2)} MAD` },
                 { label: `Réduction -${reduction}%`, val: `-${Math.round(prime * reduction / 100)} MAD`, green: true },
               ].map((l, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: l.green ? WAFA.vert : '#64748B' }}>
