@@ -205,7 +205,36 @@ export default function Telematics() {
                 ))}
               </div>
             </div>
-            <div style={{ display:"flex", gap:12 }}>
+            {/* COACHING POST-TRAJET */}
+            <div style={{ marginTop:16, borderRadius:16, overflow:"hidden", border:"1px solid #E2E8F0" }}>
+              <div style={{ background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding:"10px 14px", display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:16 }}>🧠</span>
+                <span style={{ color:"white", fontWeight:700, fontSize:13 }}>Coaching personnalisé</span>
+              </div>
+              <div style={{ background:"white", padding:"12px 14px", display:"flex", flexDirection:"column", gap:8 }}>
+                {(() => {
+                  const conseils = []
+                  const freinages = events.filter(e => e.type === "freinage").length
+                  const accels = events.filter(e => e.type === "acceleration").length
+                  if (freinages > 5) conseils.push({ icon:"🛑", text:`${freinages} freinages brusques détectés. Anticipez les ralentissements en levant le pied plus tôt.`, color:"#FEF2F2", border:"#FECACA" })
+                  else if (freinages > 2) conseils.push({ icon:"⚠️", text:`${freinages} freinages détectés. Gardez une distance de sécurité suffisante.`, color:"#FFFBEB", border:"#FDE68A" })
+                  else conseils.push({ icon:"✅", text:"Excellente maîtrise du freinage ! Continuez à anticiper les ralentissements.", color:"#F0FDF4", border:"#86EFAC" })
+                  if (accels > 5) conseils.push({ icon:"⚡", text:`${accels} accélérations brusques. Une conduite plus progressive économise du carburant.`, color:"#FEF2F2", border:"#FECACA" })
+                  else conseils.push({ icon:"🌿", text:"Bonne gestion des accélérations. Votre conduite est économique.", color:"#F0FDF4", border:"#86EFAC" })
+                  if (score >= 90) conseils.push({ icon:"🏅", text:`Score ${score}/100 — Excellent ! Vous bénéficiez de la réduction maximale -15%.`, color:"#F0FDF4", border:"#86EFAC" })
+                  else if (score >= 80) conseils.push({ icon:"📈", text:`Score ${score}/100 — Bon trajet ! Encore quelques points pour atteindre -15%.`, color:"#EFF6FF", border:"#BFDBFE" })
+                  else conseils.push({ icon:"💪", text:`Score ${score}/100 — Réduisez vos freinages pour améliorer votre score et votre prime.`, color:"#FFFBEB", border:"#FDE68A" })
+                  return conseils.map((c, i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"10px 12px", background:c.color, borderRadius:10, border:`1px solid ${c.border}` }}>
+                      <span style={{ fontSize:16, flexShrink:0 }}>{c.icon}</span>
+                      <span style={{ fontSize:12, color:"#374151", lineHeight:1.5 }}>{c.text}</span>
+                    </div>
+                  ))
+                })()}
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:12, marginTop:16 }}>
               <button onClick={resetTrajet} style={{ flex:1, padding:"16px", borderRadius:14, border:`2px solid ${WAFA.vert}`, background:"white", color:WAFA.vert, fontWeight:700, fontSize:14, cursor:"pointer" }}>Nouveau</button>
               <button onClick={saveTrajet} style={{ flex:2, padding:"16px", borderRadius:14, background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color:"white", border:"none", fontWeight:800, fontSize:14, cursor:"pointer" }}>Sauvegarder</button>
             </div>
