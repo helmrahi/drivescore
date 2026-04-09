@@ -186,6 +186,6 @@ export function useTelematics() {
     phase, setPhase, km, speedKmh, speedMax, duration,
     events, score, limiteActuelle, alerteVitesse,
     excessVitesse, error, accelEvents, excessRef, speedMaxRef,
-    startTrajet, stopTrajet, resetTrajet,
+    startTrajet, stopTrajet, resetTrajet, gpsPoints,
   }
 }

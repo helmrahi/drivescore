@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import TrajetMap from '../components/TrajetMap'
+import { useEffect, useRef } from 'react'
 import { useTelematics } from '../hooks/useTelematics'
 import { useAuth } from '../hooks/useAuth'
 import { insertTrajet } from '../services/trajetService'
@@ -11,7 +13,7 @@ export default function Telematics() {
     phase, setPhase, km, speedKmh, speedMax, duration,
     events, score, limiteActuelle, alerteVitesse,
     excessVitesse, error, accelEvents, excessRef,
-    startTrajet, stopTrajet, resetTrajet,
+    startTrajet, stopTrajet, resetTrajet, gpsPoints,
   } = useTelematics()
 
   const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : "#EF4444"
@@ -177,7 +179,8 @@ export default function Telematics() {
         {phase === "stopped" && (
           <div>
             <div style={{ background:"white", borderRadius:24, padding:32, boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:"0 0 24px", textAlign:"center" }}>Resume du trajet</h2>
+              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:"0 0 16px", textAlign:"center" }}>Résumé du trajet</h2>
+              <TrajetMap points={gpsPoints.current} />
               <div style={{ background:score >= 80 ? `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})` : score >= 60 ? `linear-gradient(135deg,${WAFA.orDark},${WAFA.or})` : "linear-gradient(135deg,#DC2626,#EF4444)", borderRadius:20, padding:"28px", textAlign:"center", marginBottom:24 }}>
                 <p style={{ color:"rgba(255,255,255,0.7)", fontSize:12, margin:"0 0 8px" }}>SCORE FINAL</p>
                 <div style={{ fontSize:72, fontWeight:900, color:"white", lineHeight:1 }}>{score}</div>
