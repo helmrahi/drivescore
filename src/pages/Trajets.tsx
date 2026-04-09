@@ -1,29 +1,42 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+
+const WAFA = {
+  vert: '#2E7D32', vertDark: '#1B5E20', or: '#F5A623',
+  orDark: '#D4891A', orLight: '#FDF3E0', noir: '#0F172A',
+  gris: '#F8FAFC', grisMid: '#E2E8F0',
+}
+
+function getScoreColor(s: number) {
+  if (s >= 90) return '#16A34A'
+  if (s >= 80) return '#2E7D32'
+  if (s >= 70) return '#D97706'
+  return '#DC2626'
+}
 
 export default function Trajets() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [trajets, setTrajets] = useState<any[]>([])
+  const [showForm, setShowForm] = useState(false)
 
   const score = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 5 - (form.conduite_nocturne ? 5 : 0))
-  const scoreColor = score >= 80 ? '#065F46' : score >= 60 ? '#F97316' : '#EF4444'
 
-  useEffect(() => {
-    async function loadTrajets() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
-      if (profile) {
-        const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', profile.pseudo_id).order('created_at', { ascending: false }).limit(10)
-        setTrajets(data || [])
-      }
+  useEffect(() => { loadTrajets() }, [success])
+
+  async function loadTrajets() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: profile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+    if (profile) {
+      const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', profile.pseudo_id).order('created_at', { ascending: false }).limit(20)
+      setTrajets(data || [])
     }
-    loadTrajets()
-  }, [success])
+  }
 
   async function soumettre(e: React.FormEvent) {
     e.preventDefault()
@@ -34,133 +47,207 @@ export default function Trajets() {
     if (profile) {
       const km = parseFloat(form.km)
       await supabase.from('trajets').insert({
-        pseudo_id: profile.pseudo_id,
-        km, type_route: form.type_route,
+        pseudo_id: profile.pseudo_id, km,
+        type_route: form.type_route,
         ville_depart: form.ville_depart,
         ville_arrivee: form.ville_arrivee,
         conduite_nocturne: form.conduite_nocturne,
         freinages_brusques: form.freinages_brusques,
         exces_vitesse_count: form.exces_vitesse_count,
         score_trajet: score,
-        cout_mad: parseFloat((km * 0.5).toFixed(2))
+        cout_mad: parseFloat((km * 0.5).toFixed(2)),
+        date_trajet: new Date().toISOString().split('T')[0]
       })
       setSuccess(true)
-      setForm({ km:'', type_route:'ville', ville_depart:'', ville_arrivee:'', conduite_nocturne:false, freinages_brusques:0, exces_vitesse_count:0 })
+      setShowForm(false)
+      setForm({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
       setTimeout(() => setSuccess(false), 3000)
     }
     setLoading(false)
   }
 
-  const inp = { width:'100%', padding:'12px 16px', borderRadius:12, border:'1.5px solid #E2E8F0', fontSize:14, outline:'none', boxSizing:'border-box' } as React.CSSProperties
+  const totalKm = trajets.reduce((s, t) => s + (t.km || 0), 0)
+  const avgScore = trajets.length > 0 ? Math.round(trajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajets.length) : 0
+  const totalCout = trajets.reduce((s, t) => s + (t.cout_mad || 0), 0)
 
   return (
-    <div style={{minHeight:'100vh',background:'#F8FAFC',fontFamily:'Inter,sans-serif'}}>
-      <header style={{background:'white',borderBottom:'1px solid #E2E8F0',padding:'14px 24px',display:'flex',alignItems:'center',gap:16}}>
-        <button onClick={() => navigate('/dashboard')} style={{background:'none',border:'none',cursor:'pointer',color:'#64748B',fontWeight:600,fontSize:14,display:'flex',alignItems:'center',gap:4}}>
-          ← Dashboard
+    <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
+
+      {/* HEADER */}
+      <header style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>📋 Mes trajets</div>
+        <button onClick={() => setShowForm(!showForm)} style={{ background: WAFA.or, border: 'none', color: WAFA.noir, borderRadius: 10, padding: '8px 14px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          {showForm ? '✕ Fermer' : '+ Déclarer'}
         </button>
-        <h1 style={{fontSize:18,fontWeight:700,color:'#0F172A',margin:0}}>Déclarer un trajet</h1>
       </header>
 
-      <div style={{maxWidth:600,margin:'0 auto',padding:'24px 16px'}}>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '12px 16px' }}>
+
         {success && (
-          <div style={{background:'#F0FDF4',border:'1px solid #86EFAC',borderRadius:12,padding:'16px',marginBottom:20,color:'#065F46',fontWeight:600,fontSize:14,textAlign:'center'}}>
-            ✅ Trajet enregistré ! Score : {score}/100
+          <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12, padding: '12px 16px', marginBottom: 12, color: WAFA.vert, fontWeight: 600, fontSize: 14, textAlign: 'center' }}>
+            ✅ Trajet enregistré — Score : {score}/100
           </div>
         )}
 
-        <div style={{background:'white',borderRadius:20,padding:24,boxShadow:'0 1px 4px rgba(0,0,0,0.08)',marginBottom:20}}>
-          <div style={{background:'linear-gradient(135deg,#065F46,#047857)',borderRadius:16,padding:20,marginBottom:20,textAlign:'center',color:'white'}}>
-            <p style={{margin:'0 0 4px',fontSize:13,opacity:0.8}}>Score estimé de ce trajet</p>
-            <div style={{fontSize:56,fontWeight:800,lineHeight:1}}>{score}</div>
-            <div style={{fontSize:14,opacity:0.8}}>/100</div>
-          </div>
-
-          <form onSubmit={soumettre} style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:600,color:'#374151',marginBottom:6}}>Kilomètres parcourus *</label>
-              <input type="number" required min="1" max="1999" placeholder="Ex: 45" value={form.km}
-                onChange={e => setForm(f => ({...f, km: e.target.value}))} style={inp} />
-              {form.km && <p style={{fontSize:12,color:'#F97316',margin:'4px 0 0'}}>Coût estimé : {(parseFloat(form.km||'0') * 0.5).toFixed(2)} MAD</p>}
+        {/* STATS GLOBALES */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {[
+            { label: 'Total km', value: `${totalKm}`, unit: 'km', color: '#3B82F6' },
+            { label: 'Score moy.', value: `${avgScore}`, unit: '/100', color: getScoreColor(avgScore) },
+            { label: 'Coût total', value: `${totalCout.toFixed(0)}`, unit: 'MAD', color: WAFA.orDark },
+          ].map((s, i) => (
+            <div key={i} style={{ background: 'white', borderRadius: 12, padding: '10px 12px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}<span style={{ fontSize: 10 }}> {s.unit}</span></div>
+              <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{s.label}</div>
             </div>
-
-            <div>
-              <label style={{display:'block',fontSize:14,fontWeight:600,color:'#374151',marginBottom:8}}>Type de route</label>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-                {[{id:'ville',label:'🏙️ Ville'},{id:'route',label:'🛣️ Route'},{id:'autoroute',label:'🚀 Auto'},{id:'mixte',label:'🔀 Mixte'}].map(t => (
-                  <button key={t.id} type="button" onClick={() => setForm(f => ({...f, type_route:t.id}))}
-                    style={{padding:'10px 6px',borderRadius:10,border:`2px solid ${form.type_route===t.id?'#065F46':'#E2E8F0'}`,background:form.type_route===t.id?'#F0FDF4':'white',color:form.type_route===t.id?'#065F46':'#374151',fontWeight:600,fontSize:12,cursor:'pointer'}}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div>
-                <label style={{display:'block',fontSize:13,fontWeight:600,color:'#374151',marginBottom:5}}>Ville départ</label>
-                <input placeholder="Casablanca" value={form.ville_depart} onChange={e => setForm(f => ({...f, ville_depart:e.target.value}))} style={inp} />
-              </div>
-              <div>
-                <label style={{display:'block',fontSize:13,fontWeight:600,color:'#374151',marginBottom:5}}>Ville arrivée</label>
-                <input placeholder="Rabat" value={form.ville_arrivee} onChange={e => setForm(f => ({...f, ville_arrivee:e.target.value}))} style={inp} />
-              </div>
-            </div>
-
-            <div style={{background:'#FFF7ED',borderRadius:12,padding:16}}>
-              <p style={{fontSize:13,fontWeight:700,color:'#F97316',margin:'0 0 12px'}}>⚠️ Incidents de conduite</p>
-              <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:13,color:'#374151'}}>🛑 Freinages brusques (-3pts chacun)</span>
-                  <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <button type="button" onClick={() => setForm(f => ({...f, freinages_brusques:Math.max(0,f.freinages_brusques-1)}))}
-                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>-</button>
-                    <span style={{fontWeight:700,minWidth:20,textAlign:'center'}}>{form.freinages_brusques}</span>
-                    <button type="button" onClick={() => setForm(f => ({...f, freinages_brusques:f.freinages_brusques+1}))}
-                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>+</button>
-                  </div>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <span style={{fontSize:13,color:'#374151'}}>🚨 Excès de vitesse (-5pts chacun)</span>
-                  <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <button type="button" onClick={() => setForm(f => ({...f, exces_vitesse_count:Math.max(0,f.exces_vitesse_count-1)}))}
-                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>-</button>
-                    <span style={{fontWeight:700,minWidth:20,textAlign:'center'}}>{form.exces_vitesse_count}</span>
-                    <button type="button" onClick={() => setForm(f => ({...f, exces_vitesse_count:f.exces_vitesse_count+1}))}
-                      style={{width:28,height:28,borderRadius:8,border:'1px solid #E2E8F0',background:'white',cursor:'pointer',fontWeight:700}}>+</button>
-                  </div>
-                </div>
-                <label style={{display:'flex',alignItems:'center',gap:10,fontSize:13,color:'#374151',cursor:'pointer'}}>
-                  <input type="checkbox" checked={form.conduite_nocturne} onChange={e => setForm(f => ({...f, conduite_nocturne:e.target.checked}))} style={{accentColor:'#065F46'}} />
-                  🌙 Conduite nocturne (-5pts)
-                </label>
-              </div>
-            </div>
-
-            <button type="submit" disabled={loading}
-              style={{padding:'16px',borderRadius:14,background:scoreColor,color:'white',border:'none',fontWeight:700,fontSize:16,cursor:'pointer'}}>
-              {loading ? 'Enregistrement...' : `✅ Enregistrer — Score ${score}/100`}
-            </button>
-          </form>
+          ))}
         </div>
 
-        {trajets.length > 0 && (
-          <div style={{background:'white',borderRadius:20,padding:24,boxShadow:'0 1px 4px rgba(0,0,0,0.08)'}}>
-            <h2 style={{fontSize:16,fontWeight:700,color:'#0F172A',marginBottom:16}}>Historique récent</h2>
-            {trajets.map((t,i) => (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 12px',background:'#F8FAFC',borderRadius:10,marginBottom:8}}>
-                <div>
-                  <p style={{fontWeight:600,fontSize:14,color:'#0F172A',margin:0}}>{t.km} km — {t.type_route}</p>
-                  <p style={{fontSize:12,color:'#94A3B8',margin:0}}>{t.date_trajet} · {t.cout_mad} MAD</p>
-                </div>
-                <div style={{padding:'4px 10px',borderRadius:20,fontSize:13,fontWeight:700,background:t.score_trajet>=80?'#F0FDF4':'#FFF7ED',color:t.score_trajet>=80?'#065F46':'#F97316'}}>
-                  {t.score_trajet}/100
+        {/* FORMULAIRE */}
+        {showForm && (
+          <div style={{ background: 'white', borderRadius: 16, padding: '16px', marginBottom: 12, border: `0.5px solid ${WAFA.grisMid}` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: WAFA.noir, marginBottom: 14 }}>📍 Nouveau trajet</div>
+
+            {/* Score preview */}
+            <div style={{ background: `${getScoreColor(score)}18`, borderRadius: 12, padding: '10px', textAlign: 'center', marginBottom: 14, border: `1px solid ${getScoreColor(score)}40` }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: getScoreColor(score) }}>{score}<span style={{ fontSize: 12 }}>/100</span></div>
+              <div style={{ fontSize: 11, color: '#64748B' }}>Score estimé</div>
+            </div>
+
+            <form onSubmit={soumettre} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 4, letterSpacing: '0.05em' }}>KILOMÈTRES *</label>
+                <input type="number" required min="1" placeholder="Ex: 45" value={form.km}
+                  onChange={e => setForm(f => ({ ...f, km: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${WAFA.grisMid}`, fontSize: 15, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6, letterSpacing: '0.05em' }}>TYPE DE ROUTE</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+                  {[{ id: 'ville', label: '🏙️ Ville' }, { id: 'route', label: '🛣️ Route' }, { id: 'autoroute', label: '🚀 Auto' }, { id: 'mixte', label: '🔀 Mixte' }].map(t => (
+                    <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, type_route: t.id }))}
+                      style={{ padding: '8px 4px', borderRadius: 8, border: `2px solid ${form.type_route === t.id ? WAFA.vert : WAFA.grisMid}`, background: form.type_route === t.id ? '#F0FDF4' : 'white', color: form.type_route === t.id ? WAFA.vert : '#64748B', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
-            ))}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>DÉPART</label>
+                  <input placeholder="Casablanca" value={form.ville_depart}
+                    onChange={e => setForm(f => ({ ...f, ville_depart: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${WAFA.grisMid}`, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>ARRIVÉE</label>
+                  <input placeholder="Rabat" value={form.ville_arrivee}
+                    onChange={e => setForm(f => ({ ...f, ville_arrivee: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${WAFA.grisMid}`, fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+
+              <div style={{ background: '#FFF7ED', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: WAFA.orDark, marginBottom: 10 }}>⚠️ Incidents</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { label: '🛑 Freinages brusques', key: 'freinages_brusques', pts: -3 },
+                    { label: '🚨 Excès de vitesse', key: 'exces_vitesse_count', pts: -5 },
+                  ].map((inc) => (
+                    <div key={inc.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: '#374151' }}>{inc.label} <span style={{ color: '#EF4444' }}>({inc.pts} pts)</span></span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, [inc.key]: Math.max(0, (f as any)[inc.key] - 1) }))}
+                          style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${WAFA.grisMid}`, background: 'white', cursor: 'pointer', fontWeight: 700 }}>-</button>
+                        <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{(form as any)[inc.key]}</span>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, [inc.key]: (f as any)[inc.key] + 1 }))}
+                          style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${WAFA.grisMid}`, background: 'white', cursor: 'pointer', fontWeight: 700 }}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={form.conduite_nocturne} onChange={e => setForm(f => ({ ...f, conduite_nocturne: e.target.checked }))} style={{ accentColor: WAFA.vert }} />
+                    🌙 Conduite nocturne (-5 pts)
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} style={{ padding: '14px', borderRadius: 12, background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color: 'white', border: 'none', fontWeight: 700, fontSize: 15, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Enregistrement...' : `✅ Enregistrer — ${score}/100`}
+              </button>
+            </form>
           </div>
         )}
+
+        {/* HISTORIQUE */}
+        <div style={{ background: 'white', borderRadius: 16, border: `0.5px solid ${WAFA.grisMid}`, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: `0.5px solid ${WAFA.grisMid}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: WAFA.noir }}>Historique</span>
+            <span style={{ fontSize: 11, color: '#94A3B8' }}>{trajets.length} trajet{trajets.length > 1 ? 's' : ''}</span>
+          </div>
+
+          {trajets.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🛣️</div>
+              <div style={{ fontSize: 14 }}>Aucun trajet enregistré</div>
+            </div>
+          ) : (
+            trajets.map((t, i) => (
+              <div key={i} style={{ padding: '12px 16px', borderBottom: i < trajets.length - 1 ? `0.5px solid ${WAFA.grisMid}` : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Icône type */}
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: t.type_route === 'ville' ? '#EFF6FF' : t.type_route === 'autoroute' ? '#F0FDF4' : WAFA.orLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                  {t.type_route === 'ville' ? '🏙️' : t.type_route === 'autoroute' ? '🚀' : '🛣️'}
+                </div>
+
+                {/* Infos */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: WAFA.noir, marginBottom: 2 }}>
+                    {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : `Trajet ${t.type_route}`}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km</span>
+                    <span style={{ fontSize: 11, color: '#94A3B8' }}>·</span>
+                    <span style={{ fontSize: 11, color: '#94A3B8' }}>{t.date_trajet}</span>
+                    {t.freinages_brusques > 0 && (
+                      <span style={{ fontSize: 10, background: '#FEF2F2', color: '#DC2626', padding: '1px 6px', borderRadius: 20 }}>🛑 {t.freinages_brusques}</span>
+                    )}
+                    {t.vitesse_max > 0 && (
+                      <span style={{ fontSize: 10, background: '#EFF6FF', color: '#1D4ED8', padding: '1px 6px', borderRadius: 20 }}>⚡ {t.vitesse_max} km/h</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Score + Coût */}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: getScoreColor(t.score_trajet) }}>{t.score_trajet}/100</div>
+                  <div style={{ fontSize: 11, color: WAFA.orDark, fontWeight: 600 }}>{t.cout_mad} MAD</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
+
+      {/* BOTTOM NAV */}
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: `0.5px solid ${WAFA.grisMid}`, display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {[
+          { icon: '🏠', label: 'Accueil', path: '/dashboard' },
+          { icon: '🚗', label: 'Télématique', path: '/telematics' },
+          { icon: '📋', label: 'Trajets', path: '/trajets' },
+          { icon: '🏆', label: 'Classement', path: '/leaderboard' },
+        ].map(item => {
+          const isActive = location.pathname === item.path
+          return (
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: isActive ? WAFA.vert : '#94A3B8' }}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
+              {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: WAFA.vert }} />}
+            </button>
+          )
+        })}
+      </nav>
     </div>
   )
 }
