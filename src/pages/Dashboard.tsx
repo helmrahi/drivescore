@@ -93,7 +93,7 @@ export default function Dashboard() {
         {/* HERO — Score + Prime */}
         <div style={{
           background: `linear-gradient(180deg, ${WAFA.vert} 0%, ${WAFA.vertDark} 100%)`,
-          padding: '20px 16px 28px',
+          padding: '14px 16px 20px',
           display: 'flex', alignItems: 'center', gap: 16,
         }}>
           {/* Score gauge */}
@@ -127,7 +127,7 @@ export default function Dashboard() {
         </div>
 
         {/* CONTENU SCROLLABLE */}
-        <div style={{ flex: 1, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 80, overflowY: 'auto' }}>
+        <div style={{ flex: 1, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 72 }}>
 
           {/* KPIs rapides */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -136,8 +136,8 @@ export default function Dashboard() {
               { label: 'Économie', value: Math.max(0, economie), unit: 'MAD', color: '#16A34A' },
               { label: 'Trajets', value: trajets.length, unit: '', color: WAFA.orDark },
             ].map((k, i) => (
-              <div key={i} style={{ background: 'white', borderRadius: 12, padding: '10px 12px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.value}{k.unit && <span style={{ fontSize: 11 }}> {k.unit}</span>}</div>
+              <div key={i} style={{ background: 'white', borderRadius: 12, padding: '8px 10px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}{k.unit && <span style={{ fontSize: 11 }}> {k.unit}</span>}</div>
                 <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>{k.label}</div>
               </div>
             ))}
@@ -145,7 +145,7 @@ export default function Dashboard() {
 
           {/* Dernier trajet + coaching */}
           {dernierTrajet ? (
-            <div style={{ background: 'white', borderRadius: 16, padding: '14px 16px', border: `0.5px solid ${WAFA.grisMid}` }}>
+            <div style={{ background: 'white', borderRadius: 16, padding: '10px 14px', border: `0.5px solid ${WAFA.grisMid}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: WAFA.noir }}>🗺️ Dernier trajet</span>
                 <span style={{ fontSize: 11, color: '#94A3B8' }}>{dernierTrajet.date_trajet}</span>
@@ -193,7 +193,7 @@ export default function Dashboard() {
           )}
 
           {/* Détail facture compact */}
-          <div style={{ background: 'white', borderRadius: 16, padding: '14px 16px', border: `0.5px solid ${WAFA.grisMid}` }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '10px 14px', border: `0.5px solid ${WAFA.grisMid}` }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: WAFA.noir, marginBottom: 10 }}>💰 Facture {new Date().toLocaleString('fr-FR', { month: 'long' })}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
@@ -214,7 +214,7 @@ export default function Dashboard() {
           </div>
 
           {/* Économies vs classique */}
-          <div style={{ background: `linear-gradient(135deg, #052E16, ${WAFA.vertDark})`, borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: `linear-gradient(135deg, #052E16, ${WAFA.vertDark})`, borderRadius: 16, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginBottom: 4 }}>Économies vs assurance classique</div>
               <div style={{ color: '#86EFAC', fontWeight: 800, fontSize: 22 }}>+{Math.max(0, economie)} MAD</div>
