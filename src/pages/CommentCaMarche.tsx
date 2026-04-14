@@ -66,7 +66,7 @@ export default function CommentCaMarche() {
           <div style={{ fontSize: 13, fontWeight: 700, color: W.noir, marginBottom: 12 }}>💰 Impact sur votre prime</div>
           {[
             { score: '90+', label: 'Excellent conducteur 🏅', sub: 'Conduite exemplaire et régulière', reduction: '-15%', bg: '#F0FDF4', color: '#16A34A', rbg: '#DCFCE7' },
-            { score: '80-89', label: 'Bon conducteur ✅', sub: 'Très peu d'incidents détectés', reduction: '-10%', bg: '#F0FDF4', color: '#2E7D32', rbg: '#DCFCE7' },
+            { score: '80-89', label: 'Bon conducteur ✅', sub: "Très peu d'incidents détectés", reduction: '-10%', bg: '#F0FDF4', color: '#2E7D32', rbg: '#DCFCE7' },
             { score: '70-79', label: 'Conducteur moyen ⚠️', sub: 'Quelques comportements à améliorer', reduction: '-5%', bg: '#FFFBEB', color: '#D97706', rbg: '#FEF3C7' },
             { score: '<70', label: 'À améliorer 💪', sub: 'Conduite risquée détectée', reduction: '0%', bg: '#FEF2F2', color: '#DC2626', rbg: '#FEE2E2' },
           ].map((r, i) => (
