@@ -160,7 +160,7 @@ export default function Dashboard() {
                       ? `${dernierTrajet.ville_depart} → ${dernierTrajet.ville_arrivee}`
                       : `${String(dernierTrajet.km)} km · ${String(dernierTrajet.type_route)}`}
                   </div>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>{parseFloat(dernierTrajet.km).toFixed(2)} km · {parseFloat(dernierTrajet.cout_mad).toFixed(2)} MAD</div>
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>{Number(dernierTrajet.km).toFixed(2)} km · {Number(dernierTrajet.cout_mad).toFixed(2)} MAD</div>
                 </div>
                 <div style={{
                   width: 44, height: 44, borderRadius: '50%',
