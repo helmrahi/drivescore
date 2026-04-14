@@ -1,112 +1,70 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getAllTrajets } from '../services/trajetService'
+import { getAllProfiles } from '../services/profileService'
 
 const WAFA = {
+  vert: '#2E7D32', vertDark: '#1B5E20', vertLight: '#4CAF50',
   or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
-  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
-  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
-}
-
-interface Driver {
-  pseudo_id: string
-  prenom: string
-  nom: string
-  score: number
-  km: number
-  trajets: number
-  badge: string
-}
-
-function getInitiales(prenom: string, nom: string) {
-  return `${prenom?.[0] || '?'}${nom?.[0] || '?'}`.toUpperCase()
-}
-
-function getAvatarColor(index: number) {
-  const colors = [
-    { bg: '#FDF3E0', text: '#D4891A' },
-    { bg: '#F0FDF4', text: '#2E7D32' },
-    { bg: '#EFF6FF', text: '#1D4ED8' },
-    { bg: '#FDF4FF', text: '#7E22CE' },
-    { bg: '#FFF1F2', text: '#BE123C' },
-  ]
-  return colors[index % colors.length]
-}
-
-function getBadge(score: number, trajets: number) {
-  if (score >= 95) return { icon: '👑', label: 'Champion', color: '#F5A623' }
-  if (score >= 90) return { icon: '🏅', label: 'Expert', color: '#2E7D32' }
-  if (score >= 80) return { icon: '⭐', label: 'Bon conducteur', color: '#3B82F6' }
-  if (score >= 70) return { icon: '🔰', label: 'En progression', color: '#8B5CF6' }
-  return { icon: '🌱', label: 'Débutant', color: '#94A3B8' }
-}
-
-function getMedal(rank: number) {
-  if (rank === 1) return { icon: '🥇', color: '#F5A623', bg: '#FDF3E0' }
-  if (rank === 2) return { icon: '🥈', color: '#94A3B8', bg: '#F1F5F9' }
-  if (rank === 3) return { icon: '🥉', color: '#D4891A', bg: '#FEF3C7' }
-  return null
+  noir: '#0F172A', gris: '#F8FAFC', grisMid: '#E2E8F0',
 }
 
 export default function Leaderboard() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [drivers, setDrivers] = useState<Driver[]>([])
-  const [loading, setLoading] = useState(true)
-  const [myPseudoId, setMyPseudoId] = useState('')
+  const [drivers, setDrivers] = useState<any[]>([])
+  const [myPseudoId, setMyPseudoId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'score' | 'km' | 'trajets'>('score')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function load() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { navigate('/login'); return }
-
-        const { data: myProfile } = await supabase
-          .from('profiles')
-          .select('pseudo_id')
-          .eq('id', user.id)
-          .single()
-        if (myProfile?.pseudo_id) setMyPseudoId(myProfile.pseudo_id)
-
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('pseudo_id, prenom, nom, afficher_leaderboard')
-          .eq('afficher_leaderboard', true)
-
-        if (!profiles || profiles.length === 0) { setLoading(false); return }
-
-        const { data: trajets } = await supabase
-          .from('trajets')
-          .select('pseudo_id, score_trajet, km')
-
-        const driversData: Driver[] = profiles.map(p => {
-          const myTrajets = (trajets || []).filter(t => t.pseudo_id === p.pseudo_id)
-          const avgScore = myTrajets.length > 0
-            ? Math.round(myTrajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / myTrajets.length)
-            : 0
-          const totalKm = parseFloat(myTrajets.reduce((s, t) => s + (t.km || 0), 0).toFixed(1))
-          const badge = getBadge(avgScore, myTrajets.length)
-          return {
-            pseudo_id: p.pseudo_id,
-            prenom: p.prenom || 'Conducteur',
-            nom: p.nom || '',
-            score: avgScore,
-            km: totalKm,
-            trajets: myTrajets.length,
-            badge: badge.icon,
-          }
-        }).filter(d => d.trajets > 0)
-
-        setDrivers(driversData)
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
-    }
     load()
-  }, [navigate])
+  }, [])
+
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: myProfile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+    if (myProfile) setMyPseudoId(myProfile.pseudo_id)
+
+    const [trajets, profiles] = await Promise.all([getAllTrajets(), getAllProfiles()])
+
+    const profileMap = new Map(profiles.map((p: any) => [p.pseudo_id, p]))
+
+    const driverMap = new Map<string, any>()
+    for (const t of trajets) {
+      const p = profileMap.get(t.pseudo_id)
+      if (!p?.afficher_leaderboard) continue
+      if (!driverMap.has(t.pseudo_id)) {
+        driverMap.set(t.pseudo_id, {
+          pseudo_id: t.pseudo_id,
+          prenom: p?.prenom || 'Conducteur',
+          scores: [], km: 0, trajets: 0,
+        })
+      }
+      const d = driverMap.get(t.pseudo_id)
+      d.scores.push(t.score_trajet || 0)
+      d.km = parseFloat((d.km + (t.km || 0)).toFixed(1))
+      d.trajets += 1
+    }
+
+    const list = Array.from(driverMap.values()).map(d => ({
+      ...d,
+      score: d.scores.length > 0 ? Math.round(d.scores.reduce((a: number, b: number) => a + b, 0) / d.scores.length) : 0,
+    })).filter(d => d.trajets > 0)
+
+    setDrivers(list)
+    setLoading(false)
+  }
+
+  function getScoreColor(s: number) {
+    if (s >= 90) return '#16A34A'
+    if (s >= 80) return '#2E7D32'
+    if (s >= 70) return '#D97706'
+    return '#DC2626'
+  }
 
   const sorted = [...drivers].sort((a, b) => {
     if (filter === 'score') return b.score - a.score
@@ -114,103 +72,104 @@ export default function Leaderboard() {
     return b.trajets - a.trajets
   })
 
-  const myRank = sorted.findIndex(d => d.pseudo_id === myPseudoId) + 1
+  const myPos = sorted.findIndex(d => d.pseudo_id === myPseudoId) + 1
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: WAFA.gris }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: 40, height: 40, border: `4px solid ${WAFA.vert}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    </div>
-  )
+  const medals = ['🥇', '🥈', '🥉']
 
   return (
-    <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeIn { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }`}</style>
+    <div style={{ minHeight: '100vh', background: WAFA.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
 
       {/* HEADER */}
-      <div style={{
-        background: `linear-gradient(135deg, ${WAFA.vertDark} 0%, ${WAFA.vert} 100%)`,
-        padding: '0', position: 'sticky', top: 0, zIndex: 50
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px' }}>
-          <button onClick={() => navigate('/dashboard')} style={{
-            background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white',
-            borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13
-          }}>← Retour</button>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'white', fontWeight: 900, fontSize: 16 }}>🏆 Classement</div>
-            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>DriveScore Maroc</div>
-          </div>
-          <div style={{ width: 80 }} />
+      <header style={{ background: `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ color: 'white', fontWeight: 800, fontSize: 17 }}>🏆 Classement</div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>DriveScore Maroc</div>
         </div>
-
-        {/* Mon rang */}
-        {myRank > 0 && (
-          <div style={{ margin: '0 16px 16px', background: 'rgba(255,255,255,0.12)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>Ma position</div>
+        {myPos > 0 && (
+          <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Ma position</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 20, padding: '4px 14px', fontWeight: 900, fontSize: 16 }}>#{myRank}</div>
-              <div style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>sur {sorted.length}</div>
+              <div style={{ background: WAFA.or, color: WAFA.noir, borderRadius: 20, padding: '4px 12px', fontWeight: 900, fontSize: 15 }}>#{myPos}</div>
+              <span style={{ color: 'white', fontSize: 13 }}>sur {sorted.length}</span>
             </div>
           </div>
         )}
-      </div>
+      </header>
 
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '16px' }}>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '12px 16px' }}>
 
         {/* FILTRES */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
           {[
             { key: 'score', label: '📊 Score' },
             { key: 'km', label: '🛣️ Km' },
             { key: 'trajets', label: '🚗 Trajets' },
           ].map(f => (
             <button key={f.key} onClick={() => setFilter(f.key as any)} style={{
-              flex: 1, padding: '10px 8px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              fontWeight: 700, fontSize: 13,
+              padding: '10px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
               background: filter === f.key ? WAFA.vert : 'white',
               color: filter === f.key ? 'white' : '#64748B',
-              boxShadow: filter === f.key ? `0 4px 12px rgba(46,125,50,0.3)` : 'none',
-              transition: 'all 0.2s'
-            }}>{f.label}</button>
+              boxShadow: filter === f.key ? '0 4px 12px rgba(46,125,50,0.3)' : 'none',
+            }}>
+              {f.label}
+            </button>
           ))}
         </div>
 
-        {/* TOP 3 */}
-        {sorted.length >= 3 && (
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
-            {/* 2ème */}
-            {[sorted[1], sorted[0], sorted[2]].map((driver, i) => {
-              const realRank = i === 0 ? 2 : i === 1 ? 1 : 3
-              const medal = getMedal(realRank)
-              const avatarColor = getAvatarColor(sorted.indexOf(driver))
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94A3B8' }}>Chargement...</div>
+        ) : sorted.length === 0 ? (
+          <div style={{ background: 'white', borderRadius: 20, padding: '40px 24px', textAlign: 'center', border: `0.5px solid ${WAFA.grisMid}` }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🏆</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: WAFA.noir, marginBottom: 8 }}>Aucun conducteur</div>
+            <div style={{ fontSize: 13, color: '#94A3B8' }}>Activez votre participation dans le tableau de bord</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {sorted.map((driver, i) => {
               const isMe = driver.pseudo_id === myPseudoId
-              const height = realRank === 1 ? 160 : realRank === 2 ? 130 : 110
+              const rank = i + 1
               return (
-                <div key={driver.pseudo_id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: 'fadeIn 0.5s ease' }}>
-                  <div style={{ fontSize: 24, marginBottom: 4 }}>{medal?.icon}</div>
+                <div key={driver.pseudo_id} style={{
+                  background: isMe ? '#F0FDF4' : 'white',
+                  borderRadius: 16, padding: '14px 16px',
+                  border: `${isMe ? '2px' : '0.5px'} solid ${isMe ? WAFA.vert : WAFA.grisMid}`,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  {/* Rang */}
+                  <div style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>
+                    {rank <= 3
+                      ? <span style={{ fontSize: 22 }}>{medals[rank - 1]}</span>
+                      : <span style={{ fontSize: 15, fontWeight: 800, color: '#94A3B8' }}>#{rank}</span>
+                    }
+                  </div>
+
+                  {/* Avatar */}
                   <div style={{
-                    width: 52, height: 52, borderRadius: '50%',
-                    background: isMe ? WAFA.vert : avatarColor.bg,
+                    width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
+                    background: isMe ? WAFA.vert : '#E2E8F0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 900, fontSize: 18,
-                    color: isMe ? 'white' : avatarColor.text,
-                    border: isMe ? `3px solid ${WAFA.or}` : `2px solid ${medal?.color}`,
-                    marginBottom: 6, boxShadow: realRank === 1 ? `0 4px 16px rgba(245,166,35,0.4)` : 'none'
+                    fontWeight: 800, fontSize: 15, color: isMe ? 'white' : '#64748B',
                   }}>
-                    {getInitiales(driver.prenom, driver.nom)}
+                    {driver.prenom.slice(0, 2).toUpperCase()}
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: WAFA.noir, textAlign: 'center', marginBottom: 2 }}>
-                    {driver.prenom}{isMe ? ' (Moi)' : ''}
+
+                  {/* Infos */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir }}>{driver.prenom}</span>
+                      {isMe && <span style={{ background: WAFA.vert, color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20 }}>MOI</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>{driver.km.toFixed(1)} km</span>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>·</span>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>{driver.trajets} trajet{driver.trajets > 1 ? 's' : ''}</span>
+                    </div>
                   </div>
-                  <div style={{
-                    width: '100%', background: medal?.bg, borderRadius: '12px 12px 0 0',
-                    height, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    justifyContent: 'center', border: `2px solid ${medal?.color}20`
-                  }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: medal?.color }}>
+
+                  {/* Valeur filtrée */}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: filter === 'score' ? getScoreColor(driver.score) : WAFA.orDark }}>
                       {filter === 'score' ? driver.score : filter === 'km' ? driver.km.toFixed(1) : driver.trajets}
                     </div>
                     <div style={{ fontSize: 10, color: '#94A3B8' }}>
@@ -223,111 +182,25 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* LISTE COMPLÈTE */}
-        <div style={{ background: 'white', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          {sorted.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94A3B8' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🏁</div>
-              <div style={{ fontSize: 14 }}>Aucun conducteur classé pour le moment</div>
-            </div>
-          ) : (
-            sorted.map((driver, i) => {
-              const rank = i + 1
-              const medal = getMedal(rank)
-              const isMe = driver.pseudo_id === myPseudoId
-              const badge = getBadge(driver.score, driver.trajets)
-              const avatarColor = getAvatarColor(i)
-              const scoreColor = driver.score >= 80 ? WAFA.vert : driver.score >= 60 ? WAFA.or : '#EF4444'
-
-              return (
-                <div key={driver.pseudo_id} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '14px 16px',
-                  background: isMe ? '#F0FDF4' : 'white',
-                  borderBottom: `1px solid ${WAFA.grisMid}`,
-                  borderLeft: isMe ? `4px solid ${WAFA.vert}` : '4px solid transparent',
-                  animation: `fadeIn ${0.1 * i + 0.2}s ease`
-                }}>
-
-                  {/* Rang */}
-                  <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
-                    {medal ? (
-                      <span style={{ fontSize: 20 }}>{medal.icon}</span>
-                    ) : (
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#94A3B8' }}>#{rank}</span>
-                    )}
-                  </div>
-
-                  {/* Avatar */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                    background: isMe ? WAFA.vert : avatarColor.bg,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 900, fontSize: 16,
-                    color: isMe ? 'white' : avatarColor.text,
-                    border: isMe ? `2px solid ${WAFA.or}` : 'none'
-                  }}>
-                    {getInitiales(driver.prenom, driver.nom)}
-                  </div>
-
-                  {/* Infos */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: WAFA.noir }}>
-                        {driver.prenom} {driver.nom?.[0]}.
-                      </span>
-                      {isMe && (
-                        <span style={{ fontSize: 10, fontWeight: 700, background: WAFA.vert, color: 'white', padding: '1px 6px', borderRadius: 20 }}>Moi</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 11 }}>{badge.icon}</span>
-                      <span style={{ fontSize: 11, color: '#94A3B8' }}>{getBadge(driver.score, driver.trajets).label}</span>
-                      <span style={{ fontSize: 11, color: '#94A3B8' }}>· {driver.trajets} trajet{driver.trajets > 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-
-                  {/* Score */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: filter === 'score' ? scoreColor : WAFA.noir }}>
-                      {filter === 'score' ? driver.score : filter === 'km' ? driver.km.toFixed(1) : driver.trajets}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#94A3B8' }}>
-                      {filter === 'score' ? '/100' : filter === 'km' ? 'km' : 'trajets'}
-                    </div>
-                  </div>
-
-                  {/* Barre score */}
-                  {filter === 'score' && (
-                    <div style={{ width: 40, flexShrink: 0 }}>
-                      <div style={{ background: WAFA.grisMid, borderRadius: 4, height: 36, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                        <div style={{ width: '100%', height: `${driver.score}%`, background: scoreColor, borderRadius: 4, transition: 'height 1s ease' }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
+        <div style={{ textAlign: 'center', fontSize: 11, color: '#94A3B8', marginTop: 16, lineHeight: 1.6 }}>
+          Classement mis à jour en temps réel · DriveScore par Wafa Assurance
         </div>
+      </div>
 
-        <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: '#94A3B8', padding: '8px' }}>
-          Classement mis à jour en temps réel · DriveScore by Wafa Assurance
-        </div>
       {/* BOTTOM NAV */}
-      <nav style={{ position:'fixed', bottom:0, left:0, right:0, background:'white', borderTop:'0.5px solid #E2E8F0', display:'flex', zIndex:100, paddingBottom:'env(safe-area-inset-bottom)' }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: `0.5px solid ${WAFA.grisMid}`, display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { icon:'🏠', label:'Accueil', path:'/dashboard' },
-          { icon:'🚗', label:'Télématique', path:'/telematics' },
-          { icon:'📋', label:'Trajets', path:'/trajets' },
-          { icon:'🏆', label:'Classement', path:'/leaderboard' },
+          { icon: '🏠', label: 'Accueil', path: '/dashboard' },
+          { icon: '🚗', label: 'Télématique', path: '/telematics' },
+          { icon: '📋', label: 'Trajets', path: '/trajets' },
+          { icon: '🏆', label: 'Classement', path: '/leaderboard' },
         ].map(item => {
           const isActive = location.pathname === item.path
           return (
-            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, padding:'10px 0', background:'none', border:'none', cursor:'pointer', color:isActive ? '#2E7D32' : '#94A3B8' }}>
-              <span style={{ fontSize:20 }}>{item.icon}</span>
-              <span style={{ fontSize:10, fontWeight:isActive ? 700 : 400 }}>{item.label}</span>
-              {isActive && <div style={{ width:4, height:4, borderRadius:'50%', background:'#2E7D32' }} />}
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: isActive ? WAFA.vert : '#94A3B8' }}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
+              {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: WAFA.vert }} />}
             </button>
           )
         })}
