@@ -23,6 +23,7 @@ export interface Trajet {
   pseudo_id: string
   contrat_id?: string
   date_trajet: string
+  gps_points?: { lat: number; lng: number; speed: number; timestamp: number }[]
   km: number
   type_route: 'ville' | 'route' | 'autoroute' | 'mixte'
   vitesse_moyenne?: number

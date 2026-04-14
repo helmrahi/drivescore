@@ -30,7 +30,7 @@ export default function Telematics() {
     const result = await insertTrajet({
       pseudo_id: profile.pseudo_id,
       km,
-      type_route: speedMax > 90 ? "autoroute" : speedMax > 50 ? "route" : "ville",
+      type_route: speedMax > 90 ? "autoroute" : speedMax > 60 ? "route" : "ville",
       vitesse_moyenne: km > 0 && duration > 0 ? Math.round(km / duration * 3600) : 0,
       vitesse_max: speedMax,
       freinages_brusques: accelEvents.current.filter(e => e.type === "freinage").length,
@@ -40,6 +40,12 @@ export default function Telematics() {
       score_trajet: score,
       cout_mad: +(km * 0.5).toFixed(2),
       date_trajet: new Date().toISOString().split("T")[0],
+      gps_points: gpsPoints.current.slice(-500).map(p => ({
+        lat: parseFloat(p.lat.toFixed(6)),
+        lng: parseFloat(p.lng.toFixed(6)),
+        speed: Math.round(p.speed * 3.6),
+        timestamp: p.timestamp,
+      })),
     })
     if (!result.success) {
       alert("Erreur sauvegarde : " + result.error)
