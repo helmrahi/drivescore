@@ -37,8 +37,16 @@ export default function Dashboard() {
   const location = useLocation()
   const { profile, loading: authLoading, logout } = useAuth()
   const { trajets, score, km, facture, loading: dataLoading } = useDashboard(profile?.pseudo_id)
-  const [leaderboardActif, setLeaderboardActif] = React.useState<boolean | null>(null)
-  const toggleActif = leaderboardActif !== null ? leaderboardActif : (profile?.afficher_leaderboard ?? false)
+  const [leaderboardActif, setLeaderboardActif] = React.useState<boolean>(false)
+  
+  // Sync avec le profil quand il est chargé
+  React.useEffect(() => {
+    if (profile?.afficher_leaderboard !== undefined) {
+      setLeaderboardActif(profile.afficher_leaderboard)
+    }
+  }, [profile?.afficher_leaderboard])
+  
+  const toggleActif = leaderboardActif
 
   const loading = authLoading || dataLoading
   const scoreColor = getScoreColor(score)
