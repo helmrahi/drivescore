@@ -31,9 +31,9 @@ export async function getTrajetStats(pseudoId: string): Promise<{
   const trajets = await getTrajets(pseudoId, 100)
   if (trajets.length === 0) return { totalKm: 0, avgScore: 0, totalTrajets: 0, totalCout: 0 }
 
-  const totalKm = trajets.reduce((s, t) => s + (t.km || 0), 0)
+  const totalKm = parseFloat(trajets.reduce((s, t) => s + (t.km || 0), 0).toFixed(2))
   const avgScore = Math.round(trajets.reduce((s, t) => s + (t.score_trajet || 0), 0) / trajets.length)
-  const totalCout = trajets.reduce((s, t) => s + (t.cout_mad || 0), 0)
+  const totalCout = parseFloat(trajets.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(2))
 
   return { totalKm, avgScore, totalTrajets: trajets.length, totalCout }
 }

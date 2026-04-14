@@ -324,7 +324,7 @@ export default function Trajets() {
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: 16, fontWeight: 800, color: W.orDark }}>{t.cout_mad} MAD</div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{t.km} km</div>
+                      <div style={{ fontSize: 11, color: '#94A3B8' }}>{parseFloat(t.km).toFixed(2)} km</div>
                     </div>
                   </div>
 
@@ -361,7 +361,7 @@ export default function Trajets() {
                     <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${W.grisMid}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                         {[
-                          { val: `${t.km} km`, label: 'Distance', color: '#3B82F6' },
+                          { val: `${parseFloat(t.km).toFixed(2)} km`, label: 'Distance', color: '#3B82F6' },
                           { val: `${t.score_trajet}/100`, label: scLabel(t.score_trajet), color: sc(t.score_trajet) },
                           { val: `${t.cout_mad} MAD`, label: 'Coût', color: W.orDark },
                         ].map((k, j) => (
