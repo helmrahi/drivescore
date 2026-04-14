@@ -70,7 +70,8 @@ export function useTelematics() {
 
       if (magnitude > (eventType === 'freinage' ? seuilDynamique : seuilAccelDynamique)) {
         const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
-        const evt: AccelEvent = { type, magnitude, timestamp: now }
+        const lastPoint = gpsPoints.current[gpsPoints.current.length - 1]
+        const evt: AccelEvent = { type, magnitude, timestamp: now, lat: lastPoint?.lat, lng: lastPoint?.lng }
         accelEvents.current.push(evt)
         setEvents([...accelEvents.current])
         const result = calculerScore(accelEvents.current, speedMaxRef.current, excessRef.current)

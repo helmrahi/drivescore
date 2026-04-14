@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import TrajetMapStrava from '../components/TrajetMapStrava'
 
 const W = {
   vert: '#2E7D32', vertDark: '#1B5E20', vertLight: '#4CAF50',
@@ -287,7 +288,7 @@ export default function Trajets() {
 
                 {/* MINIATURE CARTE */}
                 <div style={{ height: 120, position: 'relative', background: '#E8F4E8' }}>
-                  <MiniMap trajet={t} />
+                  <TrajetMapStrava points={t.gps_points || []} speedMax={t.vitesse_max || 0} height={120} interactive={false} />
                   {/* Score badge */}
                   <div style={{ position: 'absolute', top: 10, right: 10, background: sc(t.score_trajet), color: 'white', borderRadius: 20, padding: '5px 12px', fontSize: 13, fontWeight: 800, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
                     {t.score_trajet}/100

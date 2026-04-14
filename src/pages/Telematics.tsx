@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import TrajetMap from '../components/TrajetMap'
+import TrajetMapStrava from '../components/TrajetMapStrava'
 import { useEffect, useRef } from 'react'
 import { useTelematics } from '../hooks/useTelematics'
 import { useAuth } from '../hooks/useAuth'
@@ -186,7 +186,16 @@ export default function Telematics() {
           <div>
             <div style={{ background:"white", borderRadius:24, padding:32, boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:16 }}>
               <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:"0 0 16px", textAlign:"center" }}>Résumé du trajet</h2>
-              <TrajetMap points={gpsPoints.current} />
+              <TrajetMapStrava
+                points={gpsPoints.current}
+                speedMax={speedMax}
+                incidents={[
+                  ...accelEvents.current.filter(e => e.type === "freinage" && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: "freinage" as const })),
+                  ...accelEvents.current.filter(e => e.type === "acceleration" && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: "acceleration" as const })),
+                ]}
+                height={240}
+                interactive={true}
+              />
               <div style={{ background:score >= 80 ? `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})` : score >= 60 ? `linear-gradient(135deg,${WAFA.orDark},${WAFA.or})` : "linear-gradient(135deg,#DC2626,#EF4444)", borderRadius:20, padding:"28px", textAlign:"center", marginBottom:24 }}>
                 <p style={{ color:"rgba(255,255,255,0.7)", fontSize:12, margin:"0 0 8px" }}>SCORE FINAL</p>
                 <div style={{ fontSize:72, fontWeight:900, color:"white", lineHeight:1 }}>{score}</div>
