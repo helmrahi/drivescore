@@ -85,14 +85,16 @@ export default function Trajets() {
 
   const score = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 5 - (form.conduite_nocturne ? 5 : 0))
 
-  useEffect(() => { load() }, [success])
+  useEffect(() => { load() }, [])
+  useEffect(() => { if (success) load() }, [success])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: p } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
     if (p) {
-      const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', p.pseudo_id).order('created_at', { ascending: false }).limit(30)
+      const { data, error } = await supabase.from('trajets').select('*').eq('pseudo_id', p.pseudo_id).order('created_at', { ascending: false }).limit(30)
+      console.log('Trajets chargés:', data?.length, 'pseudo_id:', p.pseudo_id, 'error:', error)
       setTrajets(data || [])
     }
   }
