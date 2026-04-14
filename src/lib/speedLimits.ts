@@ -84,9 +84,46 @@ export async function getLimiteVitesse(
   return limiteIntelligente(vitesseMoyenne)
 }
 
-// Vérifie si en excès de vitesse
-export function estEnExces(vitesseActuelle: number, limite: number): boolean {
-  return vitesseActuelle > limite + 2 // 2 km/h de tolérance
+// Détermine le type de route selon vitesse GPS + type OSM
+export function detecterTypeRoute(vitesseKmh: number, typeOSM?: string): 'ville' | 'route' | 'autoroute' {
+  const type = typeOSM?.toLowerCase() || ''
+  if (type.includes('motorway') || type.includes('trunk')) return 'autoroute'
+  if (type.includes('primary') || type.includes('secondary')) return 'route'
+  if (type.includes('residential') || type.includes('living_street')) return 'ville'
+  // Fallback vitesse GPS
+  if (vitesseKmh > 90) return 'autoroute'
+  if (vitesseKmh > 60) return 'route'
+  return 'ville'
+}
+
+// Tolérance selon type de route
+export function getToleranceVitesse(typeRoute: 'ville' | 'route' | 'autoroute'): number {
+  if (typeRoute === 'autoroute') return 10
+  if (typeRoute === 'route') return 8
+  return 5
+}
+
+// Seuil freinage selon type de route
+export function getSeuilFreinage(typeRoute: 'ville' | 'route' | 'autoroute'): number {
+  if (typeRoute === 'autoroute') return 7.5
+  if (typeRoute === 'route') return 8.5
+  return 9.0
+}
+
+// Seuil accélération selon type de route
+export function getSeuilAcceleration(typeRoute: 'ville' | 'route' | 'autoroute'): number {
+  if (typeRoute === 'autoroute') return 6.0
+  if (typeRoute === 'route') return 7.0
+  return 8.0
+}
+
+// Vérifie si en excès de vitesse avec tolérance intelligente
+export function estEnExces(vitesseActuelle: number, limite: number, typeRoute?: 'ville' | 'route' | 'autoroute'): boolean {
+  // Filtre anti faux positifs OSM autoroute
+  // Si on roule vite et OSM retourne une limite de ville → ignorer
+  if (vitesseActuelle > 90 && limite < 80) return false
+  const tolerance = getToleranceVitesse(typeRoute || 'ville')
+  return vitesseActuelle > limite + tolerance
 }
 
 // Message d'alerte
@@ -95,4 +132,11 @@ export function messageAlerte(vitesseActuelle: number, limite: number): string {
   if (exces > 30) return `🚨 DANGER : +${exces} km/h au-dessus de la limite !`
   if (exces > 15) return `⚠️ Attention : +${exces} km/h au-dessus de ${limite} km/h`
   return `📍 Limite : ${limite} km/h — Ralentissez`
+}
+
+// Calcule la pénalité excès selon gravité
+export function penaliteExces(vitesseActuelle: number, limite: number): number {
+  const exces = vitesseActuelle - limite
+  if (exces > 15) return 7
+  return 3
 }

@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { GpsPoint, AccelEvent, TelematicsPhase } from '../types'
 import { calculerScore } from '../services/scoringService'
-import { getLimiteVitesse, estEnExces, messageAlerte } from '../lib/speedLimits'
+import { getLimiteVitesse, estEnExces, messageAlerte, detecterTypeRoute, getSeuilFreinage, getSeuilAcceleration } from '../lib/speedLimits'
 import { TELEMATICS } from '../config/wafa'
 
 function calcDistance(p1: GpsPoint, p2: GpsPoint): number {
@@ -62,8 +62,12 @@ export function useTelematics() {
       const dx = Math.abs(accel.x - lastAccel.current.x)
       const dy = Math.abs(accel.y - lastAccel.current.y)
       const magnitude = Math.sqrt(dx ** 2 + dy ** 2)
+      const currentSpeed = speedKmh
+      const typeRouteActuel = currentSpeed > 90 ? 'autoroute' : currentSpeed > 60 ? 'route' : 'ville'
+      const seuilDynamique = getSeuilFreinage(typeRouteActuel)
+      const seuilAccelDynamique = getSeuilAcceleration(typeRouteActuel)
 
-      if (magnitude > TELEMATICS.seuilFreinage) {
+      if (magnitude > (type === 'freinage' ? seuilDynamique : seuilAccelDynamique)) {
         const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
         const evt: AccelEvent = { type, magnitude, timestamp: now }
         accelEvents.current.push(evt)
@@ -126,7 +130,8 @@ export function useTelematics() {
           try {
             const limite = await getLimiteVitesse(point.lat, point.lng, currentSpeedKmh)
             setLimiteActuelle(limite.limite)
-            if (estEnExces(currentSpeedKmh, limite.limite)) {
+            const typeRoute = detecterTypeRoute(currentSpeedKmh, limite.type_route)
+            if (estEnExces(currentSpeedKmh, limite.limite, typeRoute)) {
               setAlerteVitesse(messageAlerte(currentSpeedKmh, limite.limite))
               excessRef.current += 1
               setExcessVitesse(excessRef.current)

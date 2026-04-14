@@ -36,7 +36,13 @@ export const SCORE_THRESHOLDS = {
 
 // Seuils télématique
 export const TELEMATICS = {
-  seuilFreinage: 7,        // magnitude accéléromètre
+  seuilFreinage: 9,        // magnitude accéléromètre ville (défaut)
+  seuilFreinageRoute: 8.5, // magnitude route nationale
+  seuilFreinageAutoroute: 7.5, // magnitude autoroute
+  seuilAccelVille: 8.0,    // accélération brusque ville
+  seuilAccelRoute: 7.0,    // accélération brusque route
+  seuilAccelAutoroute: 6.0, // accélération brusque autoroute
+  seuilUrgence: 12.0,      // freinage d'urgence tous types
   delaiEntreEvents: 2000,  // ms entre deux détections
   toleranceVitesse: 2,     // km/h de tolérance excès
   distanceMinGPS: 0.005,   // km minimum entre 2 points GPS
