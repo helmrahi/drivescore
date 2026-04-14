@@ -52,6 +52,8 @@ export interface AccelEvent {
   type: 'freinage' | 'acceleration' | 'virage'
   magnitude: number
   timestamp: number
+  lat?: number
+  lng?: number
 }
 
 export type TelematicsPhase =
