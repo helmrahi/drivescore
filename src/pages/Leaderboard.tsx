@@ -41,6 +41,7 @@ export default function Leaderboard() {
         driverMap.set(t.pseudo_id, {
           pseudo_id: t.pseudo_id,
           prenom: p?.prenom || 'Conducteur',
+          avatar_url: p?.avatar_url || null,
           scores: [], km: 0, trajets: 0,
         })
       }
