@@ -129,56 +129,94 @@ export default function Telematics() {
         )}
 
         {phase === "running" && (
-          <div>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginBottom:16, padding:"10px", background:"#FEF2F2", borderRadius:12 }}>
-              <span style={{ fontWeight:800, color:"#EF4444", fontSize:14 }}>EN COURS - {formatDuration(duration)}</span>
-            </div>
-            {alerteVitesse && <div style={{ background:"#FEF2F2", border:"2px solid #EF4444", borderRadius:14, padding:"12px 16px", marginBottom:16, textAlign:"center", fontWeight:700, fontSize:14, color:"#DC2626" }}>{alerteVitesse}</div>}
-            <div style={{ background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius:24, padding:"28px", textAlign:"center", marginBottom:16 }}>
-              <p style={{ color:"rgba(255,255,255,0.6)", fontSize:12, margin:"0 0 8px" }}>VITESSE ACTUELLE</p>
-              <div style={{ fontSize:80, fontWeight:900, color:alerteVitesse ? "#EF4444" : "white", lineHeight:1 }}>{speedKmh}</div>
-              <div style={{ fontSize:18, color:"rgba(255,255,255,0.7)", marginBottom:12 }}>km/h</div>
-              <div style={{ display:"flex", justifyContent:"center", gap:12 }}>
-                <div style={{ background:WAFA.or, color:WAFA.noir, padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:700 }}>Max : {speedMax} km/h</div>
-                {limiteActuelle && <div style={{ background:alerteVitesse ? "#EF4444" : "rgba(255,255,255,0.2)", color:"white", padding:"6px 14px", borderRadius:20, fontSize:12, fontWeight:700, border:"2px solid white" }}>Limite : {limiteActuelle} km/h</div>}
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+
+            {/* ALERTE VITESSE */}
+            {alerteVitesse && (
+              <div style={{ background:"#FEF2F2", border:"2px solid #EF4444", borderRadius:14, padding:"10px 16px", textAlign:"center", fontWeight:700, fontSize:13, color:"#DC2626", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                🚨 {alerteVitesse}
+              </div>
+            )}
+
+            {/* COMPTEUR VITESSE — style tableau de bord */}
+            <div style={{ background:`linear-gradient(160deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius:24, padding:"20px 16px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+              {/* Timer */}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+                <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:20, padding:"4px 12px", display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:"#EF4444", animation:"pulse 1s infinite" }} />
+                  <span style={{ color:"white", fontSize:12, fontWeight:700 }}>EN COURS</span>
+                </div>
+                <span style={{ color:"rgba(255,255,255,0.7)", fontSize:14, fontWeight:700 }}>{formatDuration(duration)}</span>
+              </div>
+
+              {/* Vitesse principale */}
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:88, fontWeight:900, color:alerteVitesse ? "#FCA5A5" : "white", lineHeight:1, letterSpacing:"-4px" }}>{speedKmh}</div>
+                <div style={{ fontSize:16, color:"rgba(255,255,255,0.6)", marginTop:4 }}>km/h</div>
+              </div>
+
+              {/* Limite + Max */}
+              <div style={{ display:"flex", justifyContent:"center", gap:8 }}>
+                {limiteActuelle && (
+                  <div style={{ background:alerteVitesse ? "#EF4444" : "rgba(255,255,255,0.15)", borderRadius:20, padding:"6px 14px", display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:14 }}>🚦</span>
+                    <span style={{ color:"white", fontSize:12, fontWeight:700 }}>Limite {limiteActuelle} km/h</span>
+                  </div>
+                )}
+                <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, padding:"6px 14px", display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:14 }}>⚡</span>
+                  <span style={{ color:WAFA.or, fontSize:12, fontWeight:700 }}>Max {speedMax} km/h</span>
+                </div>
               </div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-              <div style={{ background:"white", borderRadius:16, padding:"18px", textAlign:"center" }}>
-                <div style={{ fontSize:11, color:"#94A3B8", fontWeight:700, marginBottom:4 }}>DISTANCE</div>
-                <div style={{ fontSize:32, fontWeight:900, color:WAFA.vert }}>{km.toFixed(2)}</div>
-                <div style={{ fontSize:13, color:"#94A3B8" }}>km</div>
+
+            {/* KPIs — Distance + Score */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div style={{ background:"white", borderRadius:16, padding:"16px", textAlign:"center", border:"0.5px solid #E2E8F0" }}>
+                <div style={{ fontSize:10, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", marginBottom:6 }}>DISTANCE</div>
+                <div style={{ fontSize:36, fontWeight:900, color:WAFA.vert, lineHeight:1 }}>{km.toFixed(2)}</div>
+                <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>kilomètres</div>
               </div>
-              <div style={{ background:"white", borderRadius:16, padding:"18px", textAlign:"center" }}>
-                <div style={{ fontSize:11, color:"#94A3B8", fontWeight:700, marginBottom:4 }}>SCORE</div>
-                <div style={{ fontSize:32, fontWeight:900, color:scoreColor }}>{score}</div>
-                <div style={{ fontSize:13, color:"#94A3B8" }}>/100</div>
+              <div style={{ background:"white", borderRadius:16, padding:"16px", textAlign:"center", border:"0.5px solid #E2E8F0" }}>
+                <div style={{ fontSize:10, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", marginBottom:6 }}>SCORE</div>
+                <div style={{ fontSize:36, fontWeight:900, color:scoreColor, lineHeight:1 }}>{score}</div>
+                <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>/100</div>
               </div>
             </div>
-            <div style={{ background:"white", borderRadius:16, padding:"16px 18px", marginBottom:16 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:"#94A3B8", marginBottom:12 }}>INCIDENTS DETECTES</div>
+
+            {/* INCIDENTS */}
+            <div style={{ background:"white", borderRadius:16, padding:"14px 16px", border:"0.5px solid #E2E8F0" }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#94A3B8", letterSpacing:"0.06em", marginBottom:10 }}>INCIDENTS DÉTECTÉS</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 8px", background:"#FEF2F2", borderRadius:10 }}>
-                  <div style={{ fontWeight:800, fontSize:20, color:"#EF4444" }}>{events.filter(e => e.type === "freinage").length}</div>
-                  <div style={{ fontSize:10, color:"#94A3B8" }}>Freinages</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 8px", background:WAFA.orLight, borderRadius:10 }}>
-                  <div style={{ fontWeight:800, fontSize:20, color:WAFA.orDark }}>{events.filter(e => e.type === "acceleration").length}</div>
-                  <div style={{ fontSize:10, color:"#94A3B8" }}>Accel.</div>
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"10px 8px", background:"#FEF2F2", borderRadius:10 }}>
-                  <div style={{ fontWeight:800, fontSize:20, color:"#EF4444" }}>{excessVitesse}</div>
-                  <div style={{ fontSize:10, color:"#94A3B8" }}>Exces</div>
-                </div>
+                {[
+                  { label:"Freinages", val:events.filter(e=>e.type==="freinage").length, bg:"#FEF2F2", color:"#EF4444", icon:"🛑" },
+                  { label:"Accél.", val:events.filter(e=>e.type==="acceleration").length, bg:"#FEF3C7", color:WAFA.orDark, icon:"⚡" },
+                  { label:"Excès", val:excessVitesse, bg:"#FEF2F2", color:"#EF4444", icon:"🚨" },
+                ].map((inc,i) => (
+                  <div key={i} style={{ background:inc.bg, borderRadius:12, padding:"12px 8px", textAlign:"center" }}>
+                    <div style={{ fontSize:16, marginBottom:4 }}>{inc.icon}</div>
+                    <div style={{ fontSize:22, fontWeight:900, color:inc.color, lineHeight:1 }}>{inc.val}</div>
+                    <div style={{ fontSize:10, color:"#94A3B8", marginTop:3 }}>{inc.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div style={{ background:WAFA.orLight, borderRadius:14, padding:"12px 18px", marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:13, color:WAFA.orDark, fontWeight:600 }}>Cout estime</span>
-              <span style={{ fontSize:18, fontWeight:900, color:WAFA.orDark }}>{(km * 0.5).toFixed(2)} MAD</span>
+
+            {/* COÛT ESTIMÉ */}
+            <div style={{ background:`linear-gradient(135deg,${WAFA.orLight},#FEF9F0)`, borderRadius:14, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", border:`1px solid ${WAFA.or}30` }}>
+              <div>
+                <div style={{ fontSize:11, color:WAFA.orDark, fontWeight:700, marginBottom:2 }}>COÛT ESTIMÉ</div>
+                <div style={{ fontSize:11, color:"#94A3B8" }}>0,50 MAD/km</div>
+              </div>
+              <div style={{ fontSize:22, fontWeight:900, color:WAFA.orDark }}>{(km * 0.5).toFixed(2)} MAD</div>
             </div>
-            <button onClick={stopTrajet} style={{ width:"100%", padding:"18px", borderRadius:16, background:"linear-gradient(135deg,#DC2626,#EF4444)", color:"white", border:"none", fontWeight:900, fontSize:18, cursor:"pointer" }}>
-              Terminer le trajet
+
+            {/* BOUTON TERMINER */}
+            <button onClick={stopTrajet} style={{ width:"100%", padding:"18px", borderRadius:16, background:"linear-gradient(135deg,#991B1B,#DC2626)", color:"white", border:"none", fontWeight:900, fontSize:17, cursor:"pointer", boxShadow:"0 6px 20px rgba(220,38,38,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
+              ⏹ Terminer le trajet
             </button>
+
+            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
           </div>
         )}
 
