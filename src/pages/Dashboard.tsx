@@ -1,3 +1,4 @@
+import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useDashboard } from '../hooks/useDashboard'
@@ -103,7 +104,7 @@ export default function Dashboard() {
             <svg width="90" height="90" viewBox="0 0 90 90">
               <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6"/>
               <circle cx="45" cy="45" r="38" fill="none" stroke={WAFA.or} strokeWidth="6"
-                strokeDasharray={`${2 * Math.PI * 38 * score / 100} ${2 * Math.PI * 38 * (1 - score / 100)}`}
+                strokeDasharray={`${(2 * Math.PI * 38 * score / 100).toFixed(2)} ${(2 * Math.PI * 38 * (1 - score / 100)).toFixed(2)}`}
                 strokeLinecap="round"
                 transform="rotate(-90 45 45)"
               />

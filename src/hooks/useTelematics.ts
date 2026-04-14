@@ -63,11 +63,12 @@ export function useTelematics() {
       const dy = Math.abs(accel.y - lastAccel.current.y)
       const magnitude = Math.sqrt(dx ** 2 + dy ** 2)
       const currentSpeed = speedKmh
-      const typeRouteActuel = currentSpeed > 90 ? 'autoroute' : currentSpeed > 60 ? 'route' : 'ville'
+      const typeRouteActuel = speedKmh > 90 ? 'autoroute' : speedKmh > 60 ? 'route' : 'ville'
       const seuilDynamique = getSeuilFreinage(typeRouteActuel)
       const seuilAccelDynamique = getSeuilAcceleration(typeRouteActuel)
+      const eventType = dx < 0 ? 'freinage' : 'acceleration'
 
-      if (magnitude > (type === 'freinage' ? seuilDynamique : seuilAccelDynamique)) {
+      if (magnitude > (eventType === 'freinage' ? seuilDynamique : seuilAccelDynamique)) {
         const type = accel.y < lastAccel.current.y ? 'freinage' : 'acceleration'
         const evt: AccelEvent = { type, magnitude, timestamp: now }
         accelEvents.current.push(evt)
