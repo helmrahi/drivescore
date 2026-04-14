@@ -36,6 +36,8 @@ export default function Dashboard() {
   const location = useLocation()
   const { profile, loading: authLoading, logout } = useAuth()
   const { trajets, score, km, facture, loading: dataLoading } = useDashboard(profile?.pseudo_id)
+  const [leaderboardActif, setLeaderboardActif] = React.useState<boolean | null>(null)
+  const toggleActif = leaderboardActif !== null ? leaderboardActif : (profile?.afficher_leaderboard ?? false)
 
   const loading = authLoading || dataLoading
   const scoreColor = getScoreColor(score)
@@ -239,18 +241,20 @@ export default function Dashboard() {
               <div style={{ fontSize: 11, color: '#94A3B8' }}>Visible par les autres conducteurs</div>
             </div>
             <div onClick={async () => {
+              const newVal = !toggleActif
+              setLeaderboardActif(newVal)
               const { updateProfile } = await import('../services/profileService')
               const { supabase } = await import('../lib/supabase')
               const { data: { user } } = await supabase.auth.getUser()
-              if (user) await updateProfile(user.id, { afficher_leaderboard: !profile?.afficher_leaderboard })
+              if (user) await updateProfile(user.id, { afficher_leaderboard: newVal })
             }} style={{
               width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
-              background: profile?.afficher_leaderboard ? WAFA.vert : '#CBD5E1',
+              background: toggleActif ? WAFA.vert : '#CBD5E1',
               position: 'relative', transition: 'background 0.2s', flexShrink: 0,
             }}>
               <div style={{
                 position: 'absolute', top: 2,
-                left: profile?.afficher_leaderboard ? 22 : 2,
+                left: toggleActif ? 22 : 2,
                 width: 20, height: 20, borderRadius: '50%',
                 background: 'white', transition: 'left 0.2s',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
