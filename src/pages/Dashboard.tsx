@@ -223,7 +223,16 @@ export default function Dashboard() {
             <div style={{ fontSize: 36 }}>💚</div>
           </div>
 
-          {/* Toggle leaderboard */}
+          {/* Comment ça marche */}
+          <div onClick={() => navigate('/comment-ca-marche')} style={{ background: 'white', borderRadius: 16, padding: '14px 16px', border: `0.5px solid ${WAFA.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: WAFA.noir }}>📖 Comment est calculé mon score ?</div>
+              <div style={{ fontSize: 11, color: '#94A3B8' }}>Seuils, pénalités, réductions — tout comprendre</div>
+            </div>
+            <span style={{ color: '#94A3B8', fontSize: 18 }}>→</span>
+          </div>
+
+        {/* Toggle leaderboard */}
           <div style={{ background: 'white', borderRadius: 16, padding: '12px 16px', border: `0.5px solid ${WAFA.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: WAFA.noir }}>🏆 Classement public</div>

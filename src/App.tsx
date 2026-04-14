@@ -8,6 +8,7 @@ import Trajets from './pages/Trajets'
 import Telematics from './pages/Telematics'
 import ResetPassword from './pages/ResetPassword'
 import Simulateur from './pages/Simulateur'
+import CommentCaMarche from './pages/CommentCaMarche'
 import Leaderboard from './pages/Leaderboard'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/simulateur" element={<Simulateur />} />
+        <Route path="/comment-ca-marche" element={<CommentCaMarche />} />
         <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
