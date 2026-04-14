@@ -88,7 +88,7 @@ export default function CommentCaMarche() {
             { icon: '👁️', text: 'Anticipez — regardez loin devant pour éviter les freinages brusques' },
             { icon: '📏', text: 'Gardez vos distances — 2 secondes minimum avec le véhicule devant' },
             { icon: '🚦', text: 'Respectez les limites — notre GPS détecte la limite réelle de chaque route' },
-            { icon: '☀️', text: 'Conduisez de jour — préférez les trajets en journée quand c'est possible' },
+            { icon: '☀️', text: "Conduisez de jour — préférez les trajets en journée quand c'est possible" },
             { icon: '📱', text: 'Fixez votre téléphone — sur le tableau de bord pour une meilleure précision' },
           ].map((t, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: W.gris, borderRadius: 10, marginBottom: 6 }}>
