@@ -314,11 +314,8 @@ export default function Leaderboard() {
         <div style={{ marginTop: 12, textAlign: 'center', fontSize: 11, color: '#94A3B8', padding: '8px' }}>
           Classement mis à jour en temps réel · DriveScore by Wafa Assurance
         </div>
-      </div>
-    </div>
-
       {/* BOTTOM NAV */}
-      <nav id="bottom-nav-leaderboard" style={{ position:'fixed', bottom:0, left:0, right:0, background:'white', borderTop:'0.5px solid #E2E8F0', display:'flex', zIndex:100, paddingBottom:'env(safe-area-inset-bottom)' }}>
+      <nav style={{ position:'fixed', bottom:0, left:0, right:0, background:'white', borderTop:'0.5px solid #E2E8F0', display:'flex', zIndex:100, paddingBottom:'env(safe-area-inset-bottom)' }}>
         {[
           { icon:'🏠', label:'Accueil', path:'/dashboard' },
           { icon:'🚗', label:'Télématique', path:'/telematics' },
