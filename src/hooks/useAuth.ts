@@ -16,15 +16,33 @@ export function useAuth() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { navigate('/login'); return }
-      setUser(user)
-      const p = await getProfile(user.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { navigate('/login'); return }
+      setUser(session.user)
+      const p = await getProfile(session.user.id)
       setProfile(p)
       setLoading(false)
     }
     load()
-  }, [navigate])
+
+    // Écouter les changements de session — refresh automatique
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        navigate('/login')
+        return
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          setUser(session.user)
+          const p = await getProfile(session.user.id)
+          setProfile(p)
+          setLoading(false)
+        }
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function logout() {
     await supabase.auth.signOut()
