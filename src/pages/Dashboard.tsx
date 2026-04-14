@@ -158,7 +158,7 @@ export default function Dashboard() {
                   <div style={{ fontWeight: 600, fontSize: 14, color: WAFA.noir }}>
                     {dernierTrajet.ville_depart && dernierTrajet.ville_arrivee
                       ? `${dernierTrajet.ville_depart} → ${dernierTrajet.ville_arrivee}`
-                      : `${dernierTrajet.km} km · ${dernierTrajet.type_route}`}
+                      : `${String(dernierTrajet.km)} km · ${String(dernierTrajet.type_route)}`}
                   </div>
                   <div style={{ fontSize: 12, color: '#94A3B8' }}>{parseFloat(dernierTrajet.km).toFixed(2)} km · {parseFloat(dernierTrajet.cout_mad).toFixed(2)} MAD</div>
                 </div>
