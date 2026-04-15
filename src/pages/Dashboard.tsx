@@ -100,16 +100,16 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: W.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
 
       {/* HERO */}
-      <div style={{ background: '#F5F7FA', borderBottom: `0.5px solid ${W.grisMid}`, padding: '14px 16px 16px' }}>
+      <div style={{ background: `linear-gradient(160deg,${W.vertDark},${W.vert})`, padding: '14px 16px 16px' }}>
 
         {/* TOP BAR */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: W.vert }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>DriveScore <span style={{ color: W.vert }}>· Wafa</span></span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>DriveScore <span style={{ color: 'rgba(255,255,255,0.7)' }}>· Wafa</span></span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={() => navigate('/comment-ca-marche')} style={{ width: 28, height: 28, borderRadius: '50%', background: 'white', border: `0.5px solid ${W.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>❓</button>
+            <button onClick={() => navigate('/comment-ca-marche')} style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>❓</button>
             <label style={{ cursor: 'pointer', position: 'relative' }}>
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]) }} />
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: W.vert, border: `2px solid ${W.or}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}>
@@ -118,7 +118,7 @@ export default function Dashboard() {
                   : <span style={{ fontSize: 10, fontWeight: 800, color: 'white' }}>{profile?.prenom?.slice(0, 2)?.toUpperCase()}</span>}
               </div>
             </label>
-            <button onClick={logout} style={{ width: 28, height: 28, borderRadius: '50%', background: 'white', border: `0.5px solid ${W.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🚪</button>
+            <button onClick={logout} style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🚪</button>
           </div>
         </div>
 
@@ -127,7 +127,7 @@ export default function Dashboard() {
           {/* Ring */}
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
             <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0 }}>
-              <circle cx="40" cy="40" r="32" fill="none" stroke={W.grisMid} strokeWidth="5"/>
+              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="5"/>
               <circle cx="40" cy="40" r="32" fill="none" stroke={W.or} strokeWidth="5"
                 strokeDasharray={`${dash} ${circumference.toFixed(2)}`}
                 strokeLinecap="round" transform="rotate(-90 40 40)"
@@ -135,15 +135,15 @@ export default function Dashboard() {
               />
             </svg>
             <div style={{ position: 'absolute', top: 0, left: 0, width: 80, height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 24, fontWeight: 900, color: W.noir, lineHeight: 1 }}>{score}</span>
-              <span style={{ fontSize: 8, color: '#94A3B8' }}>/100</span>
+              <span style={{ fontSize: 24, fontWeight: 900, color: 'white', lineHeight: 1 }}>{score}</span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>/100</span>
             </div>
           </div>
 
           {/* Info */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 8, color: '#94A3B8', marginBottom: 3 }}>Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: getGradeColor(score), marginBottom: 8 }}>{getGrade(score)}</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'white', marginBottom: 8 }}>{getGrade(score)}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <span style={{ background: '#FDF3E0', border: `0.5px solid ${W.or}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.orDark, fontWeight: 600 }}>{total} MAD/mois</span>
               <span style={{ background: '#F0FDF4', border: '0.5px solid #86EFAC', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.vert, fontWeight: 600 }}>-{reduction}%</span>
@@ -158,9 +158,9 @@ export default function Dashboard() {
             { val: `${trajetsMois.length}`, lbl: 'trajets', color: W.orDark },
             { val: `${coutMois} MAD`, lbl: 'coût mois', color: W.vert },
           ].map((k, i) => (
-            <div key={i} style={{ background: 'white', borderRadius: 10, border: `0.5px solid ${W.grisMid}`, padding: '8px 6px', textAlign: 'center' }}>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.15)', padding: '8px 6px', textAlign: 'center' }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: k.color }}>{k.val}</div>
-              <div style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{k.lbl}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{k.lbl}</div>
             </div>
           ))}
         </div>
