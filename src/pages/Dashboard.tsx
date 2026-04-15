@@ -3,9 +3,30 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useDashboard } from '../hooks/useDashboard'
 
-const W = {
-  vert: '#2E7D32', vertDark: '#1B5E20', or: '#F5A623',
-  orDark: '#D4891A', noir: '#0F172A', gris: '#F8FAFC', grisMid: '#E2E8F0',
+const C = {
+  greenDeep: '#0D2E1C', greenDark: '#163D25', greenMid: '#1E5C35',
+  greenAccent: '#2A8A50', greenBright: '#3EBD6F',
+  amber: '#F5A623', amberLight: '#FDF0D5', amberDark: '#8B5E00',
+  red: '#E5403A', redLight: '#FDEAEA', redDark: '#8B1A17',
+  blue: '#2D7DD2', blueLight: '#E8F2FC',
+  white: '#FFFFFF', surface: '#F7F8F6', surface2: '#EDEFEB',
+  textPrimary: '#0D1F16', textSecondary: '#4A6355', textTertiary: '#8AA898',
+  border: 'rgba(13,46,28,0.08)', borderStrong: 'rgba(13,46,28,0.14)',
+  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace",
+}
+
+function getScoreColor(s: number) {
+  if (s >= 90) return C.greenBright
+  if (s >= 80) return C.greenAccent
+  if (s >= 70) return C.amber
+  return C.red
+}
+
+function getScoreLabel(s: number) {
+  if (s >= 90) return 'Excellent'
+  if (s >= 80) return 'Bon conducteur'
+  if (s >= 70) return 'Moyen'
+  return 'À améliorer'
 }
 
 function getReduction(s: number) {
@@ -15,30 +36,14 @@ function getReduction(s: number) {
   return 0
 }
 
-function getGrade(s: number) {
-  if (s >= 90) return 'Excellent 🏅'
-  if (s >= 80) return 'Bon conducteur ✅'
-  if (s >= 70) return 'Moyen ⚠️'
-  return 'À améliorer 💪'
-}
-
-function getGradeColor(s: number) {
-  if (s >= 90) return '#16A34A'
-  if (s >= 80) return '#2E7D32'
-  if (s >= 70) return '#D97706'
-  return '#DC2626'
-}
-
 function getConseil(t: any): string {
-  const fr = t.freinages_brusques || 0
-  const ex = t.exces_vitesse_count || 0
-  const sc = t.score_trajet || 0
-  if (ex > 10) return `${ex} excès de vitesse détectés. Respectez les limites pour améliorer votre score et votre prime.`
-  if (fr > 5) return `${fr} freinages brusques détectés. Anticipez les ralentissements en maintenant vos distances.`
-  if (fr > 2) return `${fr} freinages détectés. Gardez vos distances et anticipez les feux.`
-  if (sc >= 90) return `Score ${sc}/100 — Excellent trajet ! Vous bénéficiez de la réduction maximale -15%.`
-  if (sc >= 80) return `Score ${sc}/100 — Bon trajet. Encore quelques points pour atteindre -15%.`
-  return `Score ${sc}/100 — Adoptez une conduite plus souple pour améliorer votre prime.`
+  const f = t.freinages_brusques || 0
+  const e = t.exces_vitesse_count || 0
+  if (e > 10) return `${e} excès de vitesse détectés. Respectez les limites pour améliorer votre score.`
+  if (f > 5) return `${f} freinages brusques. Anticipez les ralentissements en gardant vos distances.`
+  if (f > 2) return `${f} freinages détectés. Maintenez une distance de sécurité suffisante.`
+  if (t.score_trajet >= 90) return 'Trajet exemplaire ! Continuez sur cette lancée pour maintenir votre réduction.'
+  return 'Adoptez une conduite plus souple pour gagner des points et réduire votre prime.'
 }
 
 export default function Dashboard() {
@@ -48,6 +53,8 @@ export default function Dashboard() {
   const { trajets, score, km, loading: dataLoading } = useDashboard(profile?.pseudo_id)
   const [leaderboardActif, setLeaderboardActif] = React.useState(false)
   const [uploading, setUploading] = React.useState(false)
+  const [expanded, setExpanded] = React.useState<string | null>(null)
+  const [periode, setPeriode] = React.useState<'semaine' | 'mois' | 'tout'>('mois')
 
   React.useEffect(() => {
     if (profile?.afficher_leaderboard !== undefined)
@@ -58,20 +65,22 @@ export default function Dashboard() {
   const reduction = getReduction(score)
   const prime = Math.round(200 + km * 0.5)
   const total = Math.round(prime * (1 - reduction / 100))
-  const economie = Math.max(0, 600 - total)
+  const economie = Math.max(0, 500 - total)
+  const scoreColor = getScoreColor(score)
+  const circumference = 2 * Math.PI * 37
+  const scoreOffset = circumference - (circumference * score / 100)
 
-  const trajetsMois = React.useMemo(() => {
+  const trajetsFiltres = React.useMemo(() => {
     const now = new Date()
     return trajets.filter(t => {
+      if (periode === 'tout') return true
       const d = new Date(t.date_trajet)
+      if (periode === 'semaine') return (now.getTime() - d.getTime()) / 86400000 <= 7
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     })
-  }, [trajets])
+  }, [trajets, periode])
 
-  const dernierTrajet = trajetsMois[0] || null
-  const coutMois = trajetsMois.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(2)
-  const circumference = 2 * Math.PI * 32
-  const dash = (circumference * score / 100).toFixed(2)
+  const dernierTrajet = trajetsFiltres[0]
 
   async function uploadAvatar(file: File) {
     setUploading(true)
@@ -90,155 +99,249 @@ export default function Dashboard() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: W.gris }}>
-      <div style={{ width: 36, height: 36, border: `3px solid ${W.vert}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    <div style={{ minHeight: '100vh', background: C.greenDeep, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 36, height: 36, border: `2px solid ${C.greenBright}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: W.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh', background: C.surface, fontFamily: C.fontSans, paddingBottom: 80 }}>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes pulse-dot{0%,100%{box-shadow:0 0 8px rgba(62,189,111,0.6)}50%{box-shadow:0 0 16px rgba(62,189,111,0.9)}}
+        * { box-sizing: border-box; }
+      `}</style>
 
-      {/* HERO */}
-      <div style={{ background: `linear-gradient(160deg,${W.vertDark},${W.vert})`, padding: '14px 16px 16px' }}>
+      {/* HEADER SOMBRE */}
+      <div style={{ background: C.greenDeep, position: 'relative', overflow: 'hidden' }}>
+        {/* Glow décoratif */}
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, background: 'radial-gradient(circle, rgba(62,189,111,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -30, left: 40, width: 140, height: 140, background: 'radial-gradient(circle, rgba(42,138,80,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-        {/* TOP BAR */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: W.vert }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>DriveScore <span style={{ color: 'rgba(255,255,255,0.7)' }}>· Wafa</span></span>
+        {/* TOPBAR */}
+        <div style={{ padding: '16px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.greenBright, boxShadow: '0 0 8px rgba(62,189,111,0.6)', animation: 'pulse-dot 2.5s ease-in-out infinite' }} />
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.2px' }}>
+              Wafa <span style={{ color: 'rgba(255,255,255,0.4)' }}>·</span> <span style={{ color: 'rgba(255,255,255,0.55)' }}>DriveScore</span>
+            </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={() => navigate('/comment-ca-marche')} style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>❓</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => navigate('/comment-ca-marche')} style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2"/><path d="M8 7.5V11" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" strokeLinecap="round"/><circle cx="8" cy="5.5" r="0.8" fill="rgba(255,255,255,0.6)"/></svg>
+            </button>
             <label style={{ cursor: 'pointer', position: 'relative' }}>
               <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]) }} />
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: W.vert, border: `2px solid ${W.or}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}>
-                {uploading ? <span style={{ fontSize: 10, color: 'white' }}>⏳</span>
-                  : (profile as any)?.avatar_url ? <img src={(profile as any)?.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <span style={{ fontSize: 10, fontWeight: 800, color: 'white' }}>{profile?.prenom?.slice(0, 2)?.toUpperCase()}</span>}
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: C.greenBright, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', cursor: 'pointer' }}>
+                {uploading ? <span style={{ fontSize: 10, color: C.greenDeep }}>⏳</span>
+                  : (profile as any)?.avatar_url
+                  ? <img src={(profile as any)?.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: 11, fontWeight: 600, color: C.greenDeep, fontFamily: C.fontMono }}>{profile?.prenom?.slice(0,2)?.toUpperCase()}</span>}
               </div>
             </label>
-            <button onClick={logout} style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🚪</button>
+            <button onClick={logout} style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 8H2M2 8L5 5M2 8L5 11" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" strokeLinecap="round"/><path d="M7 4V3.5A1.5 1.5 0 018.5 2H13a1 1 0 011 1v10a1 1 0 01-1 1H8.5A1.5 1.5 0 017 12.5V12" stroke="rgba(255,255,255,0.6)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            </button>
           </div>
         </div>
 
-        {/* SCORE + INFO */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+        {/* SCORE SECTION */}
+        <div style={{ padding: '20px 20px 0', display: 'flex', alignItems: 'center', gap: 20, position: 'relative', zIndex: 1 }}>
           {/* Ring */}
-          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
-            <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0 }}>
-              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="5"/>
-              <circle cx="40" cy="40" r="32" fill="none" stroke={W.or} strokeWidth="5"
-                strokeDasharray={`${dash} ${circumference.toFixed(2)}`}
-                strokeLinecap="round" transform="rotate(-90 40 40)"
-                style={{ transition: 'stroke-dasharray 1s ease' }}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <svg width="88" height="88" viewBox="0 0 88 88" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="44" cy="44" r="37" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7"/>
+              <circle cx="44" cy="44" r="37" fill="none" stroke={C.amber} strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={scoreOffset}
+                style={{ transition: 'stroke-dashoffset 1s ease' }}
               />
             </svg>
-            <div style={{ position: 'absolute', top: 0, left: 0, width: 80, height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 24, fontWeight: 900, color: 'white', lineHeight: 1 }}>{score}</span>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>/100</span>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 26, fontWeight: 600, color: 'white', lineHeight: 1, fontFamily: C.fontMono }}>{score}</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>/100</span>
             </div>
           </div>
 
-          {/* Info */}
+          {/* Infos */}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'white', marginBottom: 8 }}>{getGrade(score)}</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <span style={{ background: 'rgba(255,255,255,0.15)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'white', fontWeight: 600 }}>{total} MAD/mois</span>
-              <span style={{ background: W.or, border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.noir, fontWeight: 700 }}>-{reduction}%</span>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 5, letterSpacing: '0.3px' }}>
+              Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+              <span style={{ fontSize: 20, fontWeight: 600, color: 'white', letterSpacing: '-0.5px' }}>{getScoreLabel(score)}</span>
+              {score < 80 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(245,166,35,0.2)', border: '0.5px solid rgba(245,166,35,0.35)', borderRadius: 6, padding: '3px 7px', fontSize: 11, color: C.amber, fontWeight: 500 }}>
+                  ⚠ Attention
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 12px', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+                {total} MAD/mois
+              </div>
+              {reduction > 0 && (
+                <div style={{ background: C.greenBright, borderRadius: 20, padding: '4px 10px', fontSize: 12, color: C.greenDeep, fontWeight: 600 }}>
+                  −{reduction}%
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+        {/* STATS ROW */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '16px 20px 20px', position: 'relative', zIndex: 1 }}>
           {[
-            { val: `${km.toFixed(1)} km`, lbl: 'parcourus' },
-            { val: `${trajetsMois.length}`, lbl: 'trajets' },
-            { val: `${coutMois} MAD`, lbl: 'coût mois' },
-          ].map((k, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.15)', padding: '8px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>{k.val}</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{k.lbl}</div>
+            { val: km.toFixed(1), unit: 'km', label: 'parcourus', mono: true },
+            { val: String(trajetsFiltres.length), unit: '', label: 'trajets', mono: true },
+            { val: total.toString(), unit: 'MAD', label: 'ce mois', mono: true },
+          ].map((s, i) => (
+            <div key={i} style={{ background: 'rgba(255,255,255,0.07)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '12px' }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'white', lineHeight: 1, fontFamily: C.fontMono }}>
+                {s.val}{s.unit && <span style={{ fontSize: 11, fontWeight: 400, color: 'rgba(255,255,255,0.5)', marginLeft: 2 }}>{s.unit}</span>}
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* BODY */}
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* BOUTON DÉMARRER */}
-        <button onClick={() => navigate('/telematics')} style={{ width: '100%', padding: '14px', borderRadius: 12, background: `linear-gradient(135deg,${W.vertDark},${W.vert})`, color: 'white', border: 'none', fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 16px rgba(46,125,50,0.3)' }}>
-          🚗 Commencer un trajet
+        {/* CTA */}
+        <button onClick={() => navigate('/telematics')} style={{ width: '100%', padding: '14px 20px', background: C.greenMid, border: `0.5px solid rgba(62,189,111,0.2)`, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(62,189,111,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="white" strokeWidth="1.4"/><circle cx="9" cy="9" r="2.5" fill="white"/><path d="M9 2V4M9 14V16M2 9H4M14 9H16" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.6"/></svg>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 500, color: 'white' }}>Commencer un trajet</span>
         </button>
 
-        {/* DERNIER TRAJET */}
-        {dernierTrajet ? (
-          <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '12px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>Dernier trajet</span>
-              <button onClick={() => navigate('/trajets')} style={{ fontSize: 11, color: W.vert, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>Tous les trajets →</button>
+        {/* TRAJETS */}
+        <div style={{ background: C.white, borderRadius: 22, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ padding: '16px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px', marginBottom: 2 }}>HISTORIQUE</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: C.textPrimary }}>Mes trajets</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: W.noir, marginBottom: 2 }}>
-                  {dernierTrajet.ville_depart && dernierTrajet.ville_arrivee
-                    ? `${dernierTrajet.ville_depart} → ${dernierTrajet.ville_arrivee}`
-                    : `Trajet ${dernierTrajet.type_route}`}
-                </div>
-                <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 8 }}>
-                  {new Date(dernierTrajet.date_trajet).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · {Number(dernierTrajet.km).toFixed(2)} km · {parseFloat(String(dernierTrajet.cout_mad)).toFixed(2)} MAD
-                </div>
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                  {(dernierTrajet.freinages_brusques || 0) > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FEF2F2', color: '#DC2626' }}>🛑 {dernierTrajet.freinages_brusques} frein.</span>
-                  )}
-                  {(dernierTrajet.exces_vitesse_count || 0) > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FFF7ED', color: '#EA580C' }}>⚡ {dernierTrajet.exces_vitesse_count} excès</span>
-                  )}
-                  {(dernierTrajet.accelerations_brusques || 0) > 0 && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FEFCE8', color: '#CA8A04' }}>🔺 {dernierTrajet.accelerations_brusques} accél.</span>
-                  )}
-                  {dernierTrajet.conduite_nocturne && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#F3F4F6', color: '#6B7280' }}>🌙 Nocturne</span>
-                  )}
-                  {!(dernierTrajet.freinages_brusques) && !(dernierTrajet.exces_vitesse_count) && (
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#F0FDF4', color: '#16A34A' }}>✅ Aucun incident</span>
-                  )}
-                </div>
-              </div>
-              <div style={{
-                background: dernierTrajet.score_trajet >= 80 ? '#F0FDF4' : dernierTrajet.score_trajet >= 60 ? '#FEF3C7' : '#FEF2F2',
-                color: dernierTrajet.score_trajet >= 80 ? '#16A34A' : dernierTrajet.score_trajet >= 60 ? '#D97706' : '#DC2626',
-                borderRadius: 10, padding: '5px 10px', fontSize: 14, fontWeight: 900, flexShrink: 0,
-              }}>
-                {dernierTrajet.score_trajet}/100
-              </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {([['semaine','7j'], ['mois','Mois'], ['tout','Tout']] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setPeriode(key)} style={{
+                  padding: '5px 10px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 500,
+                  background: periode === key ? C.greenDeep : C.surface2,
+                  color: periode === key ? 'white' : C.textSecondary,
+                }}>{label}</button>
+              ))}
             </div>
           </div>
-        ) : (
-          <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🛣️</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: W.noir, marginBottom: 4 }}>Aucun trajet ce mois</div>
-            <div style={{ fontSize: 11, color: '#94A3B8' }}>Démarrez votre premier trajet GPS</div>
-          </div>
-        )}
 
-        {/* CONSEIL */}
+          {/* Liste */}
+          {trajetsFiltres.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: C.textTertiary, fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🛣️</div>
+              Aucun trajet sur cette période
+            </div>
+          ) : trajetsFiltres.slice(0, 4).map((t, i) => {
+            const isOpen = expanded === (t.id || String(i))
+            const sc = t.score_trajet || 0
+            const scColor = getScoreColor(sc)
+            const f = t.freinages_brusques || 0
+            const e = t.exces_vitesse_count || 0
+
+            return (
+              <div key={t.id || i} style={{ borderBottom: i < Math.min(trajetsFiltres.length, 4) - 1 ? `1px solid ${C.border}` : 'none' }}>
+                <div onClick={() => setExpanded(isOpen ? null : (t.id || String(i)))} style={{ padding: '14px 16px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, marginBottom: 3 }}>
+                        {t.date_trajet ? new Date(t.date_trajet).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : ''}
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: C.textPrimary }}>
+                        {t.ville_depart && t.ville_arrivee ? `${t.ville_depart} → ${t.ville_arrivee}` : `Trajet ${t.type_route || 'ville'}`}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: scColor, fontFamily: C.fontMono, marginBottom: 2 }}>{sc} / 100</div>
+                      <div style={{ fontSize: 11, color: C.textTertiary }}>{Number(t.cout_mad).toFixed(2)} MAD</div>
+                    </div>
+                  </div>
+
+                  {/* Meta row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, background: C.surface2, color: C.textSecondary, padding: '3px 8px', borderRadius: 20, fontWeight: 500 }}>
+                      {t.type_route || 'ville'}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.textTertiary }}>{Number(t.km).toFixed(2)} km</span>
+                    {f > 0 && <span style={{ fontSize: 11, background: C.redLight, color: C.redDark, padding: '3px 8px', borderRadius: 20, fontWeight: 500 }}>🛑 {f} freinage{f > 1 ? 's' : ''}</span>}
+                    {e > 0 && <span style={{ fontSize: 11, background: C.amberLight, color: C.amberDark, padding: '3px 8px', borderRadius: 20, fontWeight: 500 }}>⚡ {e} excès</span>}
+                    {f === 0 && e === 0 && <span style={{ fontSize: 11, color: C.greenAccent, fontWeight: 500 }}>✓ Aucun incident</span>}
+
+                    {/* Score bar */}
+                    <div style={{ flex: 1, minWidth: 60, height: 4, background: C.surface2, borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ width: `${sc}%`, height: '100%', background: scColor, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                    </div>
+                    <span style={{ fontSize: 10, color: C.textTertiary }}>{isOpen ? '▲' : '▼'}</span>
+                  </div>
+                </div>
+
+                {/* Conseil expandé */}
+                {isOpen && (
+                  <div style={{ margin: '0 16px 14px', background: C.amberLight, border: `1px solid rgba(245,166,35,0.25)`, borderRadius: 12, padding: '12px', display: 'flex', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,166,35,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>💡</div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.amberDark, marginBottom: 3 }}>Conseil de conduite</div>
+                      <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>{getConseil(t)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {trajetsFiltres.length > 4 && (
+            <div style={{ padding: '12px 16px', borderTop: `1px solid ${C.border}`, textAlign: 'center' }}>
+              <button onClick={() => navigate('/trajets')} style={{ fontSize: 13, color: C.greenAccent, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>
+                Voir tous les trajets ({trajetsFiltres.length}) →
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* CONSEIL DERNIER TRAJET */}
         {dernierTrajet && (
-          <div style={{ background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 12, padding: '10px 14px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309', marginBottom: 3 }}>💡 Conseil</div>
-            <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>{getConseil(dernierTrajet)}</div>
+          <div style={{ background: C.amberLight, border: `1px solid rgba(245,166,35,0.2)`, borderRadius: 16, padding: '14px', display: 'flex', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,166,35,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6.5" r="4" stroke={C.amberDark} strokeWidth="1.4"/><path d="M6.5 6.5C6.5 5.12 7.62 4 9 4" stroke={C.amberDark} strokeWidth="1.4" strokeLinecap="round"/><path d="M9 11V13M7 13H11" stroke={C.amberDark} strokeWidth="1.4" strokeLinecap="round"/></svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.amberDark, marginBottom: 3 }}>Conseil de conduite</div>
+              <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>{getConseil(dernierTrajet)}</div>
+            </div>
           </div>
         )}
 
-        {/* TOGGLE LEADERBOARD */}
-        <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* ÉCONOMIES */}
+        <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: W.noir }}>🏆 Classement public</div>
-            <div style={{ fontSize: 11, color: '#94A3B8' }}>Visible par les autres conducteurs</div>
+            <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, marginBottom: 3 }}>ÉCONOMIES CE MOIS</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: C.greenAccent, fontFamily: C.fontMono }}>+{economie} MAD</div>
+            <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 2 }}>vs assurance classique 500 MAD</div>
+          </div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(42,138,80,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>💚</div>
+        </div>
+
+        {/* CLASSEMENT */}
+        <div style={{ background: C.white, borderRadius: 16, border: `1px solid ${C.border}`, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.amberLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🏆</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: C.textPrimary }}>Classement public</div>
+              <div style={{ fontSize: 11, color: C.textTertiary }}>Visible par les autres conducteurs</div>
+            </div>
           </div>
           <div onClick={async () => {
             const newVal = !leaderboardActif
@@ -247,27 +350,27 @@ export default function Dashboard() {
             const { supabase } = await import('../lib/supabase')
             const { data: { user } } = await supabase.auth.getUser()
             if (user) await updateProfile(user.id, { afficher_leaderboard: newVal })
-          }} style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: leaderboardActif ? W.vert : '#CBD5E1', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-            <div style={{ position: 'absolute', top: 2, left: leaderboardActif ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          }} style={{ width: 44, height: 26, borderRadius: 13, cursor: 'pointer', background: leaderboardActif ? C.greenAccent : C.surface2, position: 'relative', transition: 'background 0.2s', flexShrink: 0, border: `1px solid ${leaderboardActif ? C.greenAccent : C.borderStrong}` }}>
+            <div style={{ position: 'absolute', top: 3, left: leaderboardActif ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }} />
           </div>
         </div>
 
       </div>
 
       {/* BOTTOM NAV */}
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: `0.5px solid ${W.grisMid}`, display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.border}`, display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { icon: '🏠', label: 'Accueil', path: '/dashboard' },
-          { icon: '🚗', label: 'Télématique', path: '/telematics' },
-          { icon: '📋', label: 'Trajets', path: '/trajets' },
-          { icon: '🏆', label: 'Classement', path: '/leaderboard' },
+          { icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="10" width="5" height="8" rx="1.5" fill={C.greenMid}/><rect x="7.5" y="6" width="5" height="12" rx="1.5" fill={C.greenMid}/><rect x="13" y="2" width="5" height="16" rx="1.5" fill={C.greenBright}/></svg>, label: 'Accueil', path: '/dashboard' },
+          { icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke={C.textTertiary} strokeWidth="1.4"/><circle cx="10" cy="10" r="3" stroke={C.textTertiary} strokeWidth="1.4"/><path d="M10 3V7M10 13V17M3 10H7M13 10H17" stroke={C.textTertiary} strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Télématique', path: '/telematics' },
+          { icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="4" y="2" width="12" height="16" rx="2" stroke={C.textTertiary} strokeWidth="1.4"/><path d="M7 7H13M7 10.5H13M7 14H10.5" stroke={C.textTertiary} strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Trajets', path: '/trajets' },
+          { icon: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L12.2 7.4H18L13.2 10.8L15.2 16.4L10 13L4.8 16.4L6.8 10.8L2 7.4H7.8L10 2Z" stroke={C.textTertiary} strokeWidth="1.4" strokeLinejoin="round"/></svg>, label: 'Classement', path: '/leaderboard' },
         ].map(item => {
           const isActive = location.pathname === item.path
           return (
-            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: isActive ? W.vert : '#94A3B8' }}>
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
-              {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: W.vert }} />}
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer' }}>
+              {item.icon}
+              <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400, color: isActive ? C.greenMid : C.textTertiary }}>{item.label}</span>
+              {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: C.greenBright }} />}
             </button>
           )
         })}
@@ -275,3 +378,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+const C_greenMid = '#1E5C35'

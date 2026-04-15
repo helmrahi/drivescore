@@ -4,16 +4,32 @@
 // ============================================
 
 export const WAFA = {
-  // Couleurs brand
+  // Couleurs brand — nouveau design
   or: '#F5A623',
-  orDark: '#D4891A',
-  orLight: '#FDF3E0',
-  vert: '#2E7D32',
-  vertLight: '#4CAF50',
-  vertDark: '#1B5E20',
-  noir: '#1A1A1A',
-  gris: '#F5F5F5',
-  grisMid: '#E8E8E8',
+  orDark: '#8B5E00',
+  orLight: '#FDF0D5',
+  vert: '#2A8A50',
+  vertLight: '#3EBD6F',
+  vertDark: '#1E5C35',
+  vertDeep: '#0D2E1C',
+  vertGlow: 'rgba(62,189,111,0.15)',
+  noir: '#0D1F16',
+  gris: '#F7F8F6',
+  grisMid: '#EDEFEB',
+  textPrimary: '#0D1F16',
+  textSecondary: '#4A6355',
+  textTertiary: '#8AA898',
+  border: 'rgba(13,46,28,0.08)',
+  borderStrong: 'rgba(13,46,28,0.14)',
+  red: '#E5403A',
+  redLight: '#FDEAEA',
+  redDark: '#8B1A17',
+  blue: '#2D7DD2',
+  blueLight: '#E8F2FC',
+  surface: '#F7F8F6',
+  surface2: '#EDEFEB',
+  fontSans: "'DM Sans', sans-serif",
+  fontMono: "'DM Mono', monospace",
 } as const
 
 // Tarification PAYD
