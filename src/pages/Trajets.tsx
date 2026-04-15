@@ -130,6 +130,14 @@ export default function Trajets() {
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 
+  const trajetsFiltres = trajets.filter(t => {
+    if (filtre === 'incident') return (t.freinages_brusques || 0) > 0 || (t.exces_vitesse_count || 0) > 0
+    if (filtre === 'nocturne') return t.conduite_nocturne
+    if (filtre === 'parfait') return t.score_trajet === 100
+    if (filtre === 'long') return t.km >= 10
+    return true
+  })
+
   return (
     <div style={{ minHeight: '100vh', background: W.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
 
@@ -271,7 +279,7 @@ export default function Trajets() {
         )}
 
         {/* LISTE TRAJETS */}
-        {trajets.length === 0 ? (
+        {trajetsFiltres.length === 0 ? (
           <div style={{ background: 'white', borderRadius: 20, padding: '48px 24px', textAlign: 'center', border: `0.5px solid ${W.grisMid}` }}>
             <div style={{ fontSize: 56, marginBottom: 16 }}>🛣️</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: W.noir, marginBottom: 8 }}>Aucun trajet</div>
