@@ -145,8 +145,8 @@ export default function Dashboard() {
             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'white', marginBottom: 8 }}>{getGrade(score)}</div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <span style={{ background: '#FDF3E0', border: `0.5px solid ${W.or}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.orDark, fontWeight: 600 }}>{total} MAD/mois</span>
-              <span style={{ background: '#F0FDF4', border: '0.5px solid #86EFAC', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.vert, fontWeight: 600 }}>-{reduction}%</span>
+              <span style={{ background: 'rgba(255,255,255,0.15)', border: '0.5px solid rgba(255,255,255,0.25)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'white', fontWeight: 600 }}>{total} MAD/mois</span>
+              <span style={{ background: W.or, border: 'none', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.noir, fontWeight: 700 }}>-{reduction}%</span>
             </div>
           </div>
         </div>
@@ -154,12 +154,12 @@ export default function Dashboard() {
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           {[
-            { val: `${km.toFixed(1)} km`, lbl: 'parcourus', color: '#3B82F6' },
-            { val: `${trajetsMois.length}`, lbl: 'trajets', color: W.orDark },
-            { val: `${coutMois} MAD`, lbl: 'coût mois', color: W.vert },
+            { val: `${km.toFixed(1)} km`, lbl: 'parcourus' },
+            { val: `${trajetsMois.length}`, lbl: 'trajets' },
+            { val: `${coutMois} MAD`, lbl: 'coût mois' },
           ].map((k, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.15)', padding: '8px 6px', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: k.color }}>{k.val}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>{k.val}</div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{k.lbl}</div>
             </div>
           ))}

@@ -26,6 +26,7 @@ export default function Telematics() {
 
   async function saveTrajet() {
 
+    if (km <= 0) { setError("Distance nulle — bougez au moins quelques mètres."); setTimeout(() => setError(""), 3500); resetTrajet(); return }
     if (!profile?.pseudo_id) { navigate("/login"); return }
     setPhase("saving")
     // Échantillonner les points GPS — 1 point toutes les 5 secondes max
