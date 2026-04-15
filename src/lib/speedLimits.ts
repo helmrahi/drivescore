@@ -19,11 +19,12 @@ function cacheKey(lat: number, lng: number): string {
 
 // Règles intelligentes basées sur vitesse et contexte
 export function limiteIntelligente(vitesseMoyenne: number): SpeedLimit {
-  if (vitesseMoyenne < 35) return { limite: 40, source: 'intelligent', type_route: 'Zone urbaine' }
-  if (vitesseMoyenne < 55) return { limite: 50, source: 'intelligent', type_route: 'Ville' }
-  if (vitesseMoyenne < 80) return { limite: 80, source: 'intelligent', type_route: 'Route' }
-  if (vitesseMoyenne < 100) return { limite: 100, source: 'intelligent', type_route: 'Route nationale' }
-  return { limite: 120, source: 'intelligent', type_route: 'Autoroute' }
+  // Limites fixes par défaut — ne pas se baser sur la vitesse actuelle
+  // car cela créerait un biais : plus on va vite, plus la limite estimée monte
+  if (vitesseMoyenne > 100) return { limite: 120, source: 'intelligent', type_route: 'Autoroute' }
+  if (vitesseMoyenne > 70) return { limite: 80, source: 'intelligent', type_route: 'Route nationale' }
+  // En ville par défaut — limite 50 km/h
+  return { limite: 50, source: 'intelligent', type_route: 'Ville' }
 }
 
 // Requête OpenStreetMap pour limite réelle
