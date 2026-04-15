@@ -2,10 +2,15 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const WAFA = {
-  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
-  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
-  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+const C = {
+  greenDeep: '#0D2E1C', greenDark: '#163D25', greenMid: '#1E5C35',
+  greenAccent: '#2A8A50', greenBright: '#3EBD6F',
+  amber: '#F5A623', amberLight: '#FDF0D5', amberDark: '#8B5E00',
+  red: '#E5403A', redLight: '#FDEAEA',
+  white: '#FFFFFF', surface: '#F7F8F6', surface2: '#EDEFEB',
+  textPrimary: '#0D1F16', textSecondary: '#4A6355', textTertiary: '#8AA898',
+  border: 'rgba(13,46,28,0.08)', borderStrong: 'rgba(13,46,28,0.14)',
+  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace",
 }
 
 export default function Login() {
@@ -18,8 +23,7 @@ export default function Login() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) setError('Email ou mot de passe incorrect')
     else navigate('/dashboard')
@@ -27,158 +31,123 @@ export default function Login() {
   }
 
   return (
-    <>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        .login-panel-left { display: none; }
-        @media (min-width: 768px) { .login-panel-left { display: flex; } }
-      `}</style>
+    <div style={{ minHeight: '100vh', fontFamily: C.fontSans, display: 'flex', background: C.white }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse-dot{0%,100%{box-shadow:0 0 8px rgba(62,189,111,0.6)}50%{box-shadow:0 0 16px rgba(62,189,111,0.9)}}`}</style>
 
-      <div style={{ minHeight: '100vh', fontFamily: 'Inter,sans-serif', display: 'flex', background: 'white' }}>
-
-        {/* PANNEAU GAUCHE — desktop only */}
-        <div className="login-panel-left" style={{
-          flex: '0 0 46%', flexDirection: 'column', justifyContent: 'space-between',
-          padding: '52px 56px', position: 'relative', overflow: 'hidden',
-          background: `linear-gradient(160deg,${WAFA.vertDark} 0%,${WAFA.vert} 60%,${WAFA.vertLight} 100%)`
-        }}>
-          <div style={{ position: 'absolute', top: -100, right: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(245,166,35,0.08)' }} />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 52 }}>
-              <img src="/wafa-logo.png" alt="Wafa" style={{ width: 60, height: 60, borderRadius: 12, objectFit: 'cover' }} />
-              <div>
-                <div style={{ color: 'white', fontWeight: 900, fontSize: 24, letterSpacing: '-0.5px', lineHeight: 1 }}>
-                  WAFA<span style={{ color: WAFA.or }}> ASSURANCE</span>
-                </div>
-                <div style={{ display: 'inline-block', marginTop: 6, background: WAFA.or, color: WAFA.noir, fontSize: 10, fontWeight: 800, letterSpacing: '1.5px', padding: '3px 10px', borderRadius: 20 }}>
-                  DRIVESCORE PAYD
-                </div>
-              </div>
-            </div>
-            <h1 style={{ color: 'white', fontSize: 40, fontWeight: 900, lineHeight: 1.15, marginBottom: 20, letterSpacing: '-1px' }}>
-              Conduisez mieux,<br /><span style={{ color: WAFA.or }}>payez moins.</span>
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 1.8, maxWidth: 340, marginBottom: 40 }}>
-              La première assurance auto télématique au Maroc.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[
-                { icon: '🛣️', text: '200 MAD de base + 0,50 MAD/km' },
-                { icon: '🏅', text: "Jusqu'à -15% pour les bons conducteurs" },
-                { icon: '📊', text: 'Score de conduite en temps réel' },
-                { icon: '🔐', text: 'Conforme CNDP Maroc' },
-              ].map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '12px 16px' }}>
-                  <span style={{ fontSize: 18 }}>{f.icon}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }}>{f.text}</span>
-                </div>
-              ))}
-            </div>
+      {/* PANNEAU GAUCHE — desktop */}
+      <div style={{ flex: '0 0 46%', background: C.greenDeep, padding: '52px 56px', position: 'relative', overflow: 'hidden', display: 'none' }} className="login-left">
+        <div style={{ position: 'absolute', top: -80, right: -80, width: 300, height: 300, background: 'radial-gradient(circle, rgba(62,189,111,0.18) 0%, transparent 70%)' }} />
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 56 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.greenBright, animation: 'pulse-dot 2.5s ease-in-out infinite' }} />
+            <span style={{ fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.8)' }}>Wafa · DriveScore PAYD</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 32 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: WAFA.or }} />
-            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>Wafa Assurance · Leader depuis 1972</span>
-          </div>
-        </div>
-
-        {/* PANNEAU DROIT — formulaire */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', background: 'white' }}>
-          <div style={{ width: '100%', maxWidth: 400 }}>
-
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <img src="/wafa-logo.png" alt="Wafa" style={{ width: 52, height: 52, borderRadius: 12, objectFit: 'cover', marginBottom: 10 }} />
-              <div style={{ fontWeight: 900, fontSize: 15, color: WAFA.noir }}>
-                WAFA <span style={{ color: WAFA.vert }}>ASSURANCE</span>
+          <h1 style={{ fontSize: 38, fontWeight: 600, color: 'white', lineHeight: 1.2, marginBottom: 20, letterSpacing: '-1px' }}>
+            Conduisez mieux,<br /><span style={{ color: C.amber }}>payez moins.</span>
+          </h1>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7, marginBottom: 40 }}>
+            La première assurance auto télématique au Maroc.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              '200 MAD de base + 0,50 MAD/km',
+              "Jusqu'à -15% pour les bons conducteurs",
+              'Score de conduite en temps réel',
+              'Conforme CNDP Maroc',
+            ].map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.greenBright, flexShrink: 0 }} />
+                <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 400 }}>{f}</span>
               </div>
-              <div style={{ display: 'inline-block', marginTop: 4, background: WAFA.or, color: WAFA.noir, fontSize: 9, fontWeight: 800, letterSpacing: '1.2px', padding: '2px 8px', borderRadius: 20 }}>
-                DRIVESCORE PAYD
-              </div>
-              <h2 style={{ fontSize: 26, fontWeight: 900, color: WAFA.noir, margin: '16px 0 4px', letterSpacing: '-0.5px' }}>Connexion</h2>
-              <p style={{ color: '#64748B', fontSize: 14, margin: 0 }}>Bienvenue dans votre espace personnel</p>
-            </div>
-
-            <div style={{ background: 'white', borderRadius: 20, padding: '28px 24px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: `1px solid ${WAFA.grisMid}` }}>
-              {error && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, fontWeight: 500 }}>
-                  ⚠️ {error}
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6B7280', marginBottom: 8, letterSpacing: '0.5px' }}>ADRESSE EMAIL</label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, opacity: 0.5 }}>✉️</span>
-                    <input type="email" required placeholder="sara.alami@email.com" value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      style={{ width: '100%', padding: '14px 14px 14px 44px', borderRadius: 12, border: `1.5px solid ${WAFA.grisMid}`, fontSize: 15, outline: 'none', boxSizing: 'border-box', background: WAFA.gris, color: WAFA.noir }}
-                      onFocus={e => { e.target.style.borderColor = WAFA.vert; e.target.style.background = 'white' }}
-                      onBlur={e => { e.target.style.borderColor = WAFA.grisMid; e.target.style.background = WAFA.gris }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 700, color: '#6B7280', letterSpacing: '0.5px' }}>MOT DE PASSE</label>
-                    <button type="button" onClick={() => navigate('/reset-password')} style={{ background: 'none', border: 'none', color: WAFA.vert, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>
-                      Mot de passe oublié ?
-                    </button>
-                  </div>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, opacity: 0.5 }}>🔒</span>
-                    <input type={showPwd ? 'text' : 'password'} required placeholder="••••••••••" value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      style={{ width: '100%', padding: '14px 44px', borderRadius: 12, border: `1.5px solid ${WAFA.grisMid}`, fontSize: 15, outline: 'none', boxSizing: 'border-box', background: WAFA.gris, color: WAFA.noir }}
-                      onFocus={e => { e.target.style.borderColor = WAFA.vert; e.target.style.background = 'white' }}
-                      onBlur={e => { e.target.style.borderColor = WAFA.grisMid; e.target.style.background = WAFA.gris }} />
-                    <button type="button" onClick={() => setShowPwd(!showPwd)}
-                      style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: 0.5 }}>
-                      {showPwd ? '🙈' : '👁️'}
-                    </button>
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading} style={{
-                  padding: '16px', borderRadius: 14, marginTop: 4,
-                  background: loading ? '#94A3B8' : `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-                  color: 'white', border: 'none', fontWeight: 800, fontSize: 16,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                }}>
-                  {loading ? (
-                    <><div style={{ width: 18, height: 18, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Connexion...</>
-                  ) : '→ Se connecter'}
-                </button>
-              </form>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
-                <div style={{ flex: 1, height: 1, background: WAFA.grisMid }} />
-                <span style={{ fontSize: 12, color: '#94A3B8' }}>Nouveau sur DriveScore ?</span>
-                <div style={{ flex: 1, height: 1, background: WAFA.grisMid }} />
-              </div>
-
-              <button onClick={() => navigate('/simulateur')} style={{
-                width: '100%', padding: '13px', borderRadius: 14, marginBottom: 10,
-                background: 'transparent', border: `1.5px solid ${WAFA.vert}`,
-                color: WAFA.vert, fontWeight: 700, fontSize: 14, cursor: 'pointer'
-              }}>
-                💡 Simuler ma prime avant de m'inscrire
-              </button>
-
-              <Link to="/inscription" style={{ textDecoration: 'none' }}>
-                <div style={{ padding: '15px', borderRadius: 14, border: `2px solid ${WAFA.or}`, background: WAFA.orLight, textAlign: 'center', color: WAFA.vertDark, fontWeight: 800, fontSize: 14 }}>
-                  ✨ Créer mon compte gratuitement
-                </div>
-              </Link>
-            </div>
-
-            <p style={{ fontSize: 11, color: '#94A3B8', margin: '16px 0 0', textAlign: 'center', lineHeight: 1.6 }}>
-              Données hébergées en Europe · Conforme CNDP (Loi 09-08)<br />
-              Agréé par l'ACAPS · © 2026 Wafa Assurance
-            </p>
+            ))}
           </div>
         </div>
       </div>
-    </>
+
+      {/* PANNEAU DROIT */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 20px' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: C.greenMid, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.greenBright, boxShadow: '0 0 8px rgba(62,189,111,0.8)' }} />
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: C.textSecondary, marginBottom: 4 }}>Wafa Assurance · DriveScore</div>
+            <h2 style={{ fontSize: 26, fontWeight: 600, color: C.textPrimary, letterSpacing: '-0.5px', marginBottom: 6 }}>Connexion</h2>
+            <p style={{ fontSize: 13, color: C.textTertiary }}>Bienvenue dans votre espace personnel</p>
+          </div>
+
+          <div style={{ background: C.white, borderRadius: 24, padding: '28px 24px', border: `1px solid ${C.border}`, boxShadow: '0 4px 24px rgba(13,46,28,0.06)' }}>
+            {error && (
+              <div style={{ background: C.redLight, border: `1px solid rgba(229,64,58,0.2)`, color: '#8B1A17', padding: '10px 14px', borderRadius: 12, marginBottom: 18, fontSize: 13, fontWeight: 500 }}>
+                ⚠ {error}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px', marginBottom: 7 }}>ADRESSE EMAIL</div>
+                <input type="email" required placeholder="sara.alami@email.com" value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1px solid ${C.borderStrong}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.surface, color: C.textPrimary, fontFamily: C.fontSans }} />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                  <span style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px' }}>MOT DE PASSE</span>
+                  <button type="button" onClick={() => navigate('/reset-password')} style={{ background: 'none', border: 'none', color: C.greenAccent, fontSize: 12, fontWeight: 500, cursor: 'pointer', padding: 0 }}>
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPwd ? 'text' : 'password'} required placeholder="••••••••" value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    style={{ width: '100%', padding: '12px 44px 12px 14px', borderRadius: 12, border: `1px solid ${C.borderStrong}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.surface, color: C.textPrimary, fontFamily: C.fontSans }} />
+                  <button type="button" onClick={() => setShowPwd(!showPwd)}
+                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.textTertiary, fontSize: 14 }}>
+                    {showPwd ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} style={{
+                padding: '14px', borderRadius: 14, marginTop: 4, fontFamily: C.fontSans,
+                background: loading ? C.surface2 : C.greenMid,
+                color: loading ? C.textTertiary : 'white',
+                border: 'none', fontWeight: 600, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer',
+              }}>
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    Connexion...
+                  </span>
+                ) : '→ Se connecter'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0' }}>
+              <div style={{ flex: 1, height: 1, background: C.border }} />
+              <span style={{ fontSize: 12, color: C.textTertiary }}>Nouveau sur DriveScore ?</span>
+              <div style={{ flex: 1, height: 1, background: C.border }} />
+            </div>
+
+            <button onClick={() => navigate('/simulateur')} style={{ width: '100%', padding: '12px', borderRadius: 12, marginBottom: 10, background: 'transparent', border: `1px solid ${C.borderStrong}`, color: C.textSecondary, fontWeight: 500, fontSize: 13, cursor: 'pointer', fontFamily: C.fontSans }}>
+              💡 Simuler ma prime avant de m'inscrire
+            </button>
+
+            <Link to="/inscription" style={{ textDecoration: 'none' }}>
+              <div style={{ padding: '13px', borderRadius: 12, border: `1px solid rgba(245,166,35,0.3)`, background: C.amberLight, textAlign: 'center', color: C.amberDark, fontWeight: 600, fontSize: 14 }}>
+                ✨ Créer mon compte gratuitement
+              </div>
+            </Link>
+          </div>
+
+          <p style={{ fontSize: 11, color: C.textTertiary, margin: '16px 0 0', textAlign: 'center', lineHeight: 1.6 }}>
+            Données hébergées en Europe · Conforme CNDP (Loi 09-08)<br />
+            Agréé ACAPS · © 2026 Wafa Assurance
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }
