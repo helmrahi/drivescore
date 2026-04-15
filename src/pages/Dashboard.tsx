@@ -5,8 +5,7 @@ import { useDashboard } from '../hooks/useDashboard'
 
 const W = {
   vert: '#2E7D32', vertDark: '#1B5E20', or: '#F5A623',
-  orDark: '#D4891A', orLight: '#FDF3E0', noir: '#0F172A',
-  gris: '#F8FAFC', grisMid: '#E2E8F0',
+  orDark: '#D4891A', noir: '#0F172A', gris: '#F8FAFC', grisMid: '#E2E8F0',
 }
 
 function getReduction(s: number) {
@@ -16,11 +15,37 @@ function getReduction(s: number) {
   return 0
 }
 
+function getGrade(s: number) {
+  if (s >= 90) return 'Excellent 🏅'
+  if (s >= 80) return 'Bon conducteur ✅'
+  if (s >= 70) return 'Moyen ⚠️'
+  return 'À améliorer 💪'
+}
+
+function getGradeColor(s: number) {
+  if (s >= 90) return '#16A34A'
+  if (s >= 80) return '#2E7D32'
+  if (s >= 70) return '#D97706'
+  return '#DC2626'
+}
+
+function getConseil(t: any): string {
+  const fr = t.freinages_brusques || 0
+  const ex = t.exces_vitesse_count || 0
+  const sc = t.score_trajet || 0
+  if (ex > 10) return `${ex} excès de vitesse détectés. Respectez les limites pour améliorer votre score et votre prime.`
+  if (fr > 5) return `${fr} freinages brusques détectés. Anticipez les ralentissements en maintenant vos distances.`
+  if (fr > 2) return `${fr} freinages détectés. Gardez vos distances et anticipez les feux.`
+  if (sc >= 90) return `Score ${sc}/100 — Excellent trajet ! Vous bénéficiez de la réduction maximale -15%.`
+  if (sc >= 80) return `Score ${sc}/100 — Bon trajet. Encore quelques points pour atteindre -15%.`
+  return `Score ${sc}/100 — Adoptez une conduite plus souple pour améliorer votre prime.`
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile, loading: authLoading, logout } = useAuth()
-  const { trajets, score, km, facture, loading: dataLoading } = useDashboard(profile?.pseudo_id)
+  const { trajets, score, km, loading: dataLoading } = useDashboard(profile?.pseudo_id)
   const [leaderboardActif, setLeaderboardActif] = React.useState(false)
   const [uploading, setUploading] = React.useState(false)
 
@@ -43,6 +68,11 @@ export default function Dashboard() {
     })
   }, [trajets])
 
+  const dernierTrajet = trajetsMois[0] || null
+  const coutMois = trajetsMois.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(2)
+  const circumference = 2 * Math.PI * 32
+  const dash = (circumference * score / 100).toFixed(2)
+
   async function uploadAvatar(file: File) {
     setUploading(true)
     try {
@@ -60,140 +90,184 @@ export default function Dashboard() {
   }
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: W.gris }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ width: 36, height: 36, border: `3px solid ${W.vert}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: W.gris }}>
+      <div style={{ width: 36, height: 36, border: `3px solid ${W.vert}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
   return (
-    <div style={{ minHeight: "100vh", background: W.gris, fontFamily: "Inter,sans-serif", paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh', background: W.gris, fontFamily: 'Inter,sans-serif', paddingBottom: 80 }}>
 
-      <header style={{ background: "white", borderBottom: `0.5px solid ${W.grisMid}`, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src="/wafa-logo.png" alt="Wafa" style={{ width: 30, height: 30, borderRadius: 8, objectFit: "cover" }} />
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 13, color: W.noir, lineHeight: 1 }}>GARANTIE <span style={{ color: W.vert }}>WAFA</span></div>
-            <div style={{ fontSize: 9, color: "#94A3B8", letterSpacing: "0.08em" }}>DRIVESCORE PAYD</div>
+      {/* HERO */}
+      <div style={{ background: '#F5F7FA', borderBottom: `0.5px solid ${W.grisMid}`, padding: '14px 16px 16px' }}>
+
+        {/* TOP BAR */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: W.vert }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>DriveScore <span style={{ color: W.vert }}>· Wafa</span></span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => navigate('/comment-ca-marche')} style={{ width: 28, height: 28, borderRadius: '50%', background: 'white', border: `0.5px solid ${W.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>❓</button>
+            <label style={{ cursor: 'pointer', position: 'relative' }}>
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]) }} />
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: W.vert, border: `2px solid ${W.or}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden' }}>
+                {uploading ? <span style={{ fontSize: 10, color: 'white' }}>⏳</span>
+                  : (profile as any)?.avatar_url ? <img src={(profile as any)?.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ fontSize: 10, fontWeight: 800, color: 'white' }}>{profile?.prenom?.slice(0, 2)?.toUpperCase()}</span>}
+              </div>
+            </label>
+            <button onClick={logout} style={{ width: 28, height: 28, borderRadius: '50%', background: 'white', border: `0.5px solid ${W.grisMid}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🚪</button>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <button onClick={() => navigate("/comment-ca-marche")} style={{ width: 32, height: 32, borderRadius: "50%", background: W.gris, border: `0.5px solid ${W.grisMid}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14 }}>❓</button>
-          <label style={{ cursor: "pointer", position: "relative" }}>
-            <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadAvatar(e.target.files[0]) }} />
-            <div style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: W.vert, border: `2px solid ${W.vert}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              {uploading ? <span style={{ fontSize: 11, color: "white" }}>⏳</span>
-                : (profile as any)?.avatar_url ? <img src={(profile as any)?.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : <span style={{ fontSize: 12, fontWeight: 800, color: "white" }}>{profile?.prenom?.slice(0, 2)?.toUpperCase()}</span>}
-            </div>
-            <div style={{ position: "absolute", bottom: -1, right: -1, width: 12, height: 12, borderRadius: "50%", background: W.or, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, border: "1.5px solid white" }}>📷</div>
-          </label>
-          <button onClick={logout} style={{ width: 32, height: 32, borderRadius: "50%", background: W.gris, border: `0.5px solid ${W.grisMid}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14 }}>🚪</button>
-        </div>
-      </header>
 
-      <div style={{ maxWidth: 480, margin: "0 auto" }}>
-
-        <div style={{ background: `linear-gradient(160deg,${W.vertDark},${W.vert})`, padding: "16px 16px 20px" }}>
-          <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, marginBottom: 12 }}>
-            Bonjour {profile?.prenom} 👋 · {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-            <svg width="82" height="82" viewBox="0 0 82 82" style={{ flexShrink: 0 }}>
-              <circle cx="41" cy="41" r="34" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6"/>
-              <circle cx="41" cy="41" r="34" fill="none" stroke={W.or} strokeWidth="6"
-                strokeDasharray={`${(2*Math.PI*34*score/100).toFixed(2)} ${(2*Math.PI*34).toFixed(2)}`}
-                strokeLinecap="round" transform="rotate(-90 41 41)"
-                style={{ transition: "stroke-dasharray 1s ease" }}
+        {/* SCORE + INFO */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+          {/* Ring */}
+          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+            <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0 }}>
+              <circle cx="40" cy="40" r="32" fill="none" stroke={W.grisMid} strokeWidth="5"/>
+              <circle cx="40" cy="40" r="32" fill="none" stroke={W.or} strokeWidth="5"
+                strokeDasharray={`${dash} ${circumference}`}
+                strokeLinecap="round" transform="rotate(-90 40 40)"
+                style={{ transition: 'stroke-dasharray 1s ease' }}
               />
-              <text x="41" y="37" textAnchor="middle" fill="white" fontSize="18" fontWeight="900" fontFamily="Inter">{score}</text>
-              <text x="41" y="50" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize="8" fontFamily="Inter">/100</text>
             </svg>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 10, marginBottom: 3 }}>Score de conduite</div>
-              <div style={{ color: "white", fontSize: 18, fontWeight: 900, marginBottom: 8 }}>
-                {score >= 90 ? "Excellent 🏅" : score >= 80 ? "Bon conducteur ✅" : score >= 70 ? "Moyen ⚠️" : "À améliorer 💪"}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {[
-                  { val: `${total}`, sub: "MAD/mois", color: W.or },
-                  { val: `-${reduction}%`, sub: "Réduction", color: "#86EFAC" },
-                  { val: `+${economie}`, sub: "MAD éco", color: "#93C5FD" },
-                ].map((k, i) => (
-                  <div key={i} style={{ background: "rgba(255,255,255,0.12)", borderRadius: 8, padding: "6px 8px", flex: 1, textAlign: "center" }}>
-                    <div style={{ color: k.color, fontWeight: 900, fontSize: 14, lineHeight: 1 }}>{k.val}</div>
-                    <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 7, marginTop: 2 }}>{k.sub}</div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ position: 'absolute', top: 0, left: 0, width: 80, height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 24, fontWeight: 900, color: W.noir, lineHeight: 1 }}>{score}</span>
+              <span style={{ fontSize: 8, color: '#94A3B8' }}>/100</span>
             </div>
           </div>
-          <button onClick={() => navigate("/telematics")} style={{ width: "100%", padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", color: "white", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            🚗 Commencez un trajet
-          </button>
+
+          {/* Info */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 8, color: '#94A3B8', marginBottom: 3 }}>Bonjour {profile?.prenom} · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: getGradeColor(score), marginBottom: 8 }}>{getGrade(score)}</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{ background: '#FDF3E0', border: `0.5px solid ${W.or}`, borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.orDark, fontWeight: 600 }}>{total} MAD/mois</span>
+              <span style={{ background: '#F0FDF4', border: '0.5px solid #86EFAC', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: W.vert, fontWeight: 600 }}>-{reduction}%</span>
+            </div>
+          </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "10px 16px" }}>
+        {/* KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
           {[
-            { label: "Km parcourus", value: km.toFixed(1), unit: "km", color: "#3B82F6" },
-            { label: "Trajets", value: trajetsMois.length, unit: "", color: W.orDark },
-            { label: "Coût total", value: `${trajetsMois.reduce((s, t) => s + (t.cout_mad || 0), 0).toFixed(0)}`, unit: "MAD", color: W.vert },
+            { val: `${km.toFixed(1)} km`, lbl: 'parcourus', color: '#3B82F6' },
+            { val: `${trajetsMois.length}`, lbl: 'trajets', color: W.orDark },
+            { val: `${coutMois} MAD`, lbl: 'coût mois', color: W.vert },
           ].map((k, i) => (
-            <div key={i} style={{ background: "white", borderRadius: 12, padding: "10px", textAlign: "center", border: `0.5px solid ${W.grisMid}` }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: k.color, lineHeight: 1 }}>{k.value}</div>
-              {k.unit && <div style={{ fontSize: 8, color: "#94A3B8", marginTop: 1 }}>{k.unit}</div>}
-              <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3 }}>{k.label}</div>
+            <div key={i} style={{ background: 'white', borderRadius: 10, border: `0.5px solid ${W.grisMid}`, padding: '8px 6px', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: k.color }}>{k.val}</div>
+              <div style={{ fontSize: 8, color: '#94A3B8', marginTop: 2 }}>{k.lbl}</div>
             </div>
           ))}
         </div>
+      </div>
 
-        <div style={{ padding: "0 16px 10px" }}>
-          <button onClick={() => navigate('/trajets')} style={{ width: '100%', background: 'white', border: `0.5px solid ${W.grisMid}`, borderRadius: 16, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 22 }}>📋</span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>Mes trajets</div>
-                <div style={{ fontSize: 11, color: '#94A3B8' }}>{trajetsMois.length} trajet{trajetsMois.length > 1 ? 's' : ''} ce mois</div>
+      {/* BODY */}
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+        {/* BOUTON DÉMARRER */}
+        <button onClick={() => navigate('/telematics')} style={{ width: '100%', padding: '14px', borderRadius: 12, background: `linear-gradient(135deg,${W.vertDark},${W.vert})`, color: 'white', border: 'none', fontWeight: 800, fontSize: 15, cursor: 'pointer', boxShadow: '0 4px 16px rgba(46,125,50,0.3)' }}>
+          🚗 Commencer un trajet
+        </button>
+
+        {/* DERNIER TRAJET */}
+        {dernierTrajet ? (
+          <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>Dernier trajet</span>
+              <button onClick={() => navigate('/trajets')} style={{ fontSize: 11, color: W.vert, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>Tous les trajets →</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: W.noir, marginBottom: 2 }}>
+                  {dernierTrajet.ville_depart && dernierTrajet.ville_arrivee
+                    ? `${dernierTrajet.ville_depart} → ${dernierTrajet.ville_arrivee}`
+                    : `Trajet ${dernierTrajet.type_route}`}
+                </div>
+                <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 8 }}>
+                  {new Date(dernierTrajet.date_trajet).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · {parseFloat(dernierTrajet.km).toFixed(2)} km · {dernierTrajet.cout_mad} MAD
+                </div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {(dernierTrajet.freinages_brusques || 0) > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FEF2F2', color: '#DC2626' }}>🛑 {dernierTrajet.freinages_brusques} frein.</span>
+                  )}
+                  {(dernierTrajet.exces_vitesse_count || 0) > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FFF7ED', color: '#EA580C' }}>⚡ {dernierTrajet.exces_vitesse_count} excès</span>
+                  )}
+                  {(dernierTrajet.accelerations_brusques || 0) > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#FEFCE8', color: '#CA8A04' }}>🔺 {dernierTrajet.accelerations_brusques} accél.</span>
+                  )}
+                  {dernierTrajet.conduite_nocturne && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#F3F4F6', color: '#6B7280' }}>🌙 Nocturne</span>
+                  )}
+                  {!(dernierTrajet.freinages_brusques) && !(dernierTrajet.exces_vitesse_count) && (
+                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 7, background: '#F0FDF4', color: '#16A34A' }}>✅ Aucun incident</span>
+                  )}
+                </div>
+              </div>
+              <div style={{
+                background: dernierTrajet.score_trajet >= 80 ? '#F0FDF4' : dernierTrajet.score_trajet >= 60 ? '#FEF3C7' : '#FEF2F2',
+                color: dernierTrajet.score_trajet >= 80 ? '#16A34A' : dernierTrajet.score_trajet >= 60 ? '#D97706' : '#DC2626',
+                borderRadius: 10, padding: '5px 10px', fontSize: 14, fontWeight: 900, flexShrink: 0,
+              }}>
+                {dernierTrajet.score_trajet}/100
               </div>
             </div>
-            <span style={{ fontSize: 20, color: '#CBD5E1' }}>›</span>
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🛣️</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: W.noir, marginBottom: 4 }}>Aucun trajet ce mois</div>
+            <div style={{ fontSize: 11, color: '#94A3B8' }}>Démarrez votre premier trajet GPS</div>
+          </div>
+        )}
 
-        <div style={{ margin: "0 16px 12px", background: "white", borderRadius: 16, padding: "12px 16px", border: `0.5px solid ${W.grisMid}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {/* CONSEIL */}
+        {dernierTrajet && (
+          <div style={{ background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 12, padding: '10px 14px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309', marginBottom: 3 }}>💡 Conseil</div>
+            <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>{getConseil(dernierTrajet)}</div>
+          </div>
+        )}
+
+        {/* TOGGLE LEADERBOARD */}
+        <div style={{ background: 'white', borderRadius: 14, border: `0.5px solid ${W.grisMid}`, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: W.noir }}>🏆 Classement public</div>
-            <div style={{ fontSize: 11, color: "#94A3B8" }}>Visible par les autres conducteurs</div>
+            <div style={{ fontSize: 11, color: '#94A3B8' }}>Visible par les autres conducteurs</div>
           </div>
           <div onClick={async () => {
             const newVal = !leaderboardActif
             setLeaderboardActif(newVal)
-            const { updateProfile } = await import("../services/profileService")
-            const { supabase } = await import("../lib/supabase")
+            const { updateProfile } = await import('../services/profileService')
+            const { supabase } = await import('../lib/supabase')
             const { data: { user } } = await supabase.auth.getUser()
             if (user) await updateProfile(user.id, { afficher_leaderboard: newVal })
-          }} style={{ width: 44, height: 24, borderRadius: 12, cursor: "pointer", background: leaderboardActif ? W.vert : "#CBD5E1", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
-            <div style={{ position: "absolute", top: 2, left: leaderboardActif ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "white", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
+          }} style={{ width: 44, height: 24, borderRadius: 12, cursor: 'pointer', background: leaderboardActif ? W.vert : '#CBD5E1', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: 2, left: leaderboardActif ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
           </div>
         </div>
 
       </div>
 
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "white", borderTop: `0.5px solid ${W.grisMid}`, display: "flex", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {/* BOTTOM NAV */}
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'white', borderTop: `0.5px solid ${W.grisMid}`, display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { icon: "🏠", label: "Accueil", path: "/dashboard" },
-          { icon: "🚗", label: "Télématique", path: "/telematics" },
-          { icon: "📋", label: "Trajets", path: "/trajets" },
-          { icon: "🏆", label: "Classement", path: "/leaderboard" },
+          { icon: '🏠', label: 'Accueil', path: '/dashboard' },
+          { icon: '🚗', label: 'Télématique', path: '/telematics' },
+          { icon: '📋', label: 'Trajets', path: '/trajets' },
+          { icon: '🏆', label: 'Classement', path: '/leaderboard' },
         ].map(item => {
           const isActive = location.pathname === item.path
           return (
-            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: isActive ? W.vert : "#94A3B8" }}>
+            <button key={item.path} onClick={() => navigate(item.path)} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: isActive ? W.vert : '#94A3B8' }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
               <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 400 }}>{item.label}</span>
-              {isActive && <div style={{ width: 4, height: 4, borderRadius: "50%", background: W.vert }} />}
+              {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: W.vert }} />}
             </button>
           )
         })}
