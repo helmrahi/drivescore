@@ -100,7 +100,7 @@ export default function CommentCaMarche() {
             { icon: '👁️', text: 'Anticipez — regardez loin devant pour éviter les freinages' },
             { icon: '📏', text: 'Gardez vos distances — 2 secondes minimum avec le véhicule devant' },
             { icon: '🚦', text: 'Respectez les limites — notre GPS détecte la limite réelle' },
-            { icon: '☀️', text: 'Conduisez de jour quand c'est possible' },
+            { icon: "☀️", text: "Conduisez de jour quand c'est possible" },
             { icon: '📱', text: 'Fixez votre téléphone sur le tableau de bord pour plus de précision' },
           ].map((t, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', background: C.surface, borderRadius: 10, marginBottom: 6 }}>
