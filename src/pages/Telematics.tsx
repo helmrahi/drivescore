@@ -53,7 +53,9 @@ export default function Telematics() {
       gps_points: sampledPoints,
     })
     if (!result.success) {
-      alert("Erreur sauvegarde : " + result.error)
+      console.error("Erreur sauvegarde:", result.error)
+      setError("Erreur sauvegarde : " + result.error)
+      setTimeout(() => setError(''), 4000)
       setPhase("stopped")
       return
     }
