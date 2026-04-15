@@ -129,7 +129,7 @@ export default function Dashboard() {
             <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', top: 0, left: 0 }}>
               <circle cx="40" cy="40" r="32" fill="none" stroke={W.grisMid} strokeWidth="5"/>
               <circle cx="40" cy="40" r="32" fill="none" stroke={W.or} strokeWidth="5"
-                strokeDasharray={`${dash} ${circumference}`}
+                strokeDasharray={`${dash} ${circumference.toFixed(2)}`}
                 strokeLinecap="round" transform="rotate(-90 40 40)"
                 style={{ transition: 'stroke-dasharray 1s ease' }}
               />
@@ -189,7 +189,7 @@ export default function Dashboard() {
                     : `Trajet ${dernierTrajet.type_route}`}
                 </div>
                 <div style={{ fontSize: 10, color: '#94A3B8', marginBottom: 8 }}>
-                  {new Date(dernierTrajet.date_trajet).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · {parseFloat(dernierTrajet.km).toFixed(2)} km · {dernierTrajet.cout_mad} MAD
+                  {new Date(dernierTrajet.date_trajet).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })} · {Number(dernierTrajet.km).toFixed(2)} km · {parseFloat(String(dernierTrajet.cout_mad)).toFixed(2)} MAD
                 </div>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                   {(dernierTrajet.freinages_brusques || 0) > 0 && (

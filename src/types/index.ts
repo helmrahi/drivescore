@@ -63,6 +63,7 @@ export type TelematicsPhase =
   | 'running'
   | 'stopped'
   | 'saving'
+  | 'saved'
 
 // --- SCORING ---
 export interface ScoreResult {
