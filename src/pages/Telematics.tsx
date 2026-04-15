@@ -1,10 +1,33 @@
 import { useNavigate } from 'react-router-dom'
-import TrajetMapStrava from '../components/TrajetMapStrava'
-import { useEffect, useRef } from 'react'
 import { useTelematics } from '../hooks/useTelematics'
 import { useAuth } from '../hooks/useAuth'
 import { insertTrajet } from '../services/trajetService'
-import { WAFA } from '../config/wafa'
+import TrajetMapStrava from '../components/TrajetMapStrava'
+
+const C = {
+  greenDeep: '#0D2E1C', greenDark: '#163D25', greenMid: '#1E5C35',
+  greenAccent: '#2A8A50', greenBright: '#3EBD6F',
+  amber: '#F5A623', amberLight: '#FDF0D5', amberDark: '#8B5E00',
+  red: '#E5403A', redLight: '#FDEAEA', redDark: '#8B1A17',
+  blue: '#2D7DD2', blueLight: '#E8F2FC',
+  white: '#FFFFFF', surface: '#F7F8F6', surface2: '#EDEFEB',
+  textPrimary: '#0D1F16', textSecondary: '#4A6355', textTertiary: '#8AA898',
+  border: 'rgba(13,46,28,0.08)', borderStrong: 'rgba(13,46,28,0.14)',
+  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace",
+}
+
+function sc(s: number) {
+  if (s >= 90) return C.greenBright
+  if (s >= 80) return C.greenAccent
+  if (s >= 70) return C.amber
+  return C.red
+}
+
+function formatDuration(s: number) {
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}m ${sec.toString().padStart(2, '0')}s`
+}
 
 export default function Telematics() {
   const navigate = useNavigate()
@@ -12,340 +35,308 @@ export default function Telematics() {
   const {
     phase, setPhase, km, speedKmh, speedMax, duration,
     events, score, limiteActuelle, alerteVitesse,
-    excessVitesse, error, setError, accelEvents, excessRef,
+    excessVitesse, error, setError, accelEvents, excessRef, speedMaxRef,
     startTrajet, stopTrajet, resetTrajet, gpsPoints,
   } = useTelematics()
 
-  const scoreColor = score >= 80 ? WAFA.vert : score >= 60 ? WAFA.or : "#EF4444"
-
-  function formatDuration(s: number) {
-    const m = Math.floor(s / 60)
-    const sec = s % 60
-    return `${m}m ${sec.toString().padStart(2, "0")}s`
-  }
+  const scoreColor = sc(score)
+  const circumference = 2 * Math.PI * 37
+  const scoreOffset = circumference - (circumference * score / 100)
 
   async function saveTrajet() {
-
-    if (km <= 0) { setError("Distance nulle — bougez au moins quelques mètres."); setTimeout(() => setError(""), 3500); resetTrajet(); return }
-    if (!profile?.pseudo_id) { navigate("/login"); return }
-    setPhase("saving")
-    // Échantillonner les points GPS — 1 point toutes les 5 secondes max
-    const allPoints = gpsPoints.current
-    const sampledPoints = allPoints.filter((_, i) => i % 5 === 0).slice(0, 150).map(p => ({
-      lat: parseFloat(p.lat.toFixed(5)),
-      lng: parseFloat(p.lng.toFixed(5)),
-      speed: Math.round(p.speed * 3.6),
-      timestamp: p.timestamp,
-    }))
+    if (!profile?.pseudo_id) { navigate('/login'); return }
+    if (km < 0.5) {
+      const ok = window.confirm(`Trajet très court (${km.toFixed(2)} km). Sauvegarder quand même ?`)
+      if (!ok) { resetTrajet(); return }
+    }
+    setPhase('saving')
+    const sampledPoints = gpsPoints.current
+      .filter((_, i) => i % 5 === 0).slice(0, 150)
+      .map(p => ({ lat: parseFloat(p.lat.toFixed(5)), lng: parseFloat(p.lng.toFixed(5)), speed: Math.round(p.speed * 3.6), timestamp: p.timestamp }))
 
     const result = await insertTrajet({
-      pseudo_id: profile.pseudo_id,
-      km,
-      type_route: speedMax > 90 ? "autoroute" : speedMax > 60 ? "route" : "ville",
+      pseudo_id: profile.pseudo_id, km,
+      type_route: speedMax > 90 ? 'autoroute' : speedMax > 60 ? 'route' : 'ville',
       vitesse_moyenne: km > 0 && duration > 0 ? Math.round(km / duration * 3600) : 0,
       vitesse_max: speedMax,
-      freinages_brusques: accelEvents.current.filter(e => e.type === "freinage").length,
-      accelerations_brusques: accelEvents.current.filter(e => e.type === "acceleration").length,
+      freinages_brusques: accelEvents.current.filter(e => e.type === 'freinage').length,
+      accelerations_brusques: accelEvents.current.filter(e => e.type === 'acceleration').length,
       exces_vitesse_count: excessRef.current,
-      conduite_nocturne: new Date().getHours() >= 21 || new Date().getHours() <= 6,
+      conduite_nocturne: new Date().getHours() >= 22 || new Date().getHours() <= 5,
       score_trajet: score,
       cout_mad: +(km * 0.5).toFixed(2),
-      date_trajet: new Date().toISOString().split("T")[0],
+      date_trajet: new Date().toISOString().split('T')[0],
       gps_points: sampledPoints,
     })
+
     if (!result.success) {
-      console.error("Erreur sauvegarde:", result.error)
-      setError("Erreur sauvegarde : " + result.error)
-      setTimeout(() => setError(''), 4000)
-      setPhase("stopped")
+      if (setError) setError('Erreur sauvegarde : ' + result.error)
+      setTimeout(() => { if (setError) setError('') }, 4000)
+      setPhase('stopped')
       return
     }
-    setPhase("saved")
-    setTimeout(() => navigate("/dashboard"), 2000)
+    setPhase('saved')
+    setTimeout(() => navigate('/dashboard'), 2000)
   }
 
   return (
-    <div style={{ minHeight:"100vh", background:WAFA.gris, fontFamily:"Inter,sans-serif" }}>
-      <header style={{ background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding:"16px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <button onClick={() => navigate("/dashboard")} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"white", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontWeight:600, fontSize:13 }}>
-          ← Tableau de bord
-        </button>
-        <div style={{ textAlign:"center" }}>
-          <div style={{ color:"white", fontWeight:800, fontSize:16 }}>Mode Télématique</div>
-          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11 }}>GPS + Accéléromètre</div>
-        </div>
-        <div style={{ width:80 }} />
-      </header>
+    <div style={{ minHeight: '100vh', background: C.surface, fontFamily: C.fontSans }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
 
-      <div style={{ maxWidth:480, margin:"0 auto", padding:"24px 16px" }}>
+      {/* HEADER */}
+      <div style={{ background: C.greenDeep, padding: '16px 20px 20px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, background: 'radial-gradient(circle, rgba(62,189,111,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+          <button onClick={() => navigate('/dashboard')} style={{ background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+            ← Tableau de bord
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>Mode Télématique</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>GPS + Accéléromètre</div>
+          </div>
+          <div style={{ width: 80 }} />
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px', paddingBottom: 32 }}>
+
         {error && (
-          <div style={{
-            position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
-            background: '#1E293B', color: 'white',
-            padding: '12px 20px', borderRadius: 14, fontSize: 13, fontWeight: 600,
-            zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-            maxWidth: 320, textAlign: 'center',
-          }}>
-            ⏱️ {error}
+          <div style={{ background: C.redLight, border: `1px solid rgba(229,64,58,0.25)`, borderRadius: 12, padding: '12px 16px', marginBottom: 16, color: C.redDark, fontSize: 13, fontWeight: 500 }}>
+            ⚠ {error}
           </div>
         )}
 
-        {phase === "saving" && <div style={{ background:"#F0FDF4", border:"1px solid #86EFAC", color:WAFA.vert, padding:"16px", borderRadius:14, marginBottom:20, fontSize:14, fontWeight:700, textAlign:"center" }}>Trajet sauvegarde ! Redirection...</div>}
-
-        {phase === "idle" && (
-          <div style={{ textAlign:"center" }}>
-            <div style={{ background:"white", borderRadius:24, padding:"48px 32px", boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:20 }}>
-              <div style={{ marginBottom:28 }}>
-                <div style={{ 
-                  width:96, height:96, borderRadius:"50%", 
-                  background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:48, margin:"0 auto 20px",
-                  boxShadow:"0 12px 40px rgba(46,125,50,0.25)"
-                }}>🚗</div>
-                <h2 style={{ fontSize:22, fontWeight:800, color:WAFA.noir, margin:"0 0 10px", letterSpacing:"-0.3px" }}>Mode Télématique</h2>
-                <p style={{ color:"#94A3B8", fontSize:13, lineHeight:1.6, margin:0 }}>
-                  GPS · Accéléromètre · Limites de vitesse
-                </p>
+        {/* IDLE */}
+        {phase === 'idle' && (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ background: C.white, borderRadius: 24, padding: '40px 28px', border: `1px solid ${C.border}`, marginBottom: 16 }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: C.greenMid, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 8px 32px rgba(30,92,53,0.3)' }}>
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="white" strokeWidth="1.8"/><circle cx="18" cy="18" r="5" fill="white"/><path d="M18 4V8M18 28V32M4 18H8M28 18H32" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.6"/></svg>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:32, textAlign:"left" }}>
+              <h2 style={{ fontSize: 20, fontWeight: 600, color: C.textPrimary, margin: '0 0 8px', letterSpacing: '-0.3px' }}>Mode Télématique</h2>
+              <p style={{ color: C.textTertiary, fontSize: 13, lineHeight: 1.6, margin: '0 0 28px' }}>GPS · Accéléromètre · Limites de vitesse OSM</p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28, textAlign: 'left' }}>
                 {[
-                  { icon:"📍", text:"GPS trace votre itinéraire en temps réel" },
-                  { icon:"⚡", text:"Accéléromètre détecte les freinages" },
-                  { icon:"🚦", text:"Détection limite de vitesse en temps réel" },
-                  { icon:"📊", text:"Score calculé automatiquement" },
-                ].map((f,i) => (
-                  <div key={i} style={{ 
-                    display:"flex", alignItems:"center", gap:12, 
-                    padding:"10px 14px", 
-                    background:i % 2 === 0 ? "#F8FAF8" : "white", 
-                    borderRadius:10,
-                    border:`1px solid ${WAFA.grisMid}`,
-                  }}>
-                    <span style={{ fontSize:20, width:28, textAlign:"center", flexShrink:0 }}>{f.icon}</span>
-                    <span style={{ fontSize:13, color:"#475569", fontWeight:500 }}>{f.text}</span>
+                  { icon: '📍', text: 'GPS trace votre itinéraire en temps réel' },
+                  { icon: '⚡', text: 'Accéléromètre détecte les freinages' },
+                  { icon: '🚦', text: 'Limite de vitesse détectée automatiquement' },
+                  { icon: '📊', text: 'Score calculé à la fin du trajet' },
+                ].map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: C.surface, borderRadius: 12, border: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>{f.icon}</span>
+                    <span style={{ fontSize: 13, color: C.textSecondary, fontWeight: 500 }}>{f.text}</span>
                   </div>
                 ))}
               </div>
-              <button onClick={startTrajet} style={{ 
-                width:"100%", padding:"18px", borderRadius:16, 
-                background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, 
-                color:"white", border:"none", fontWeight:800, fontSize:16, 
-                cursor:"pointer", letterSpacing:"0.3px",
-                boxShadow:"0 8px 24px rgba(46,125,50,0.4)"
-              }}>
-                🚀 Démarrer le trajet
+
+              <button onClick={startTrajet} style={{ width: '100%', padding: '16px', borderRadius: 16, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 16, cursor: 'pointer', fontFamily: C.fontSans, boxShadow: '0 6px 20px rgba(30,92,53,0.3)' }}>
+                Commencer le trajet
               </button>
             </div>
           </div>
         )}
 
-        {phase === "requesting" && (
-          <div style={{ textAlign:"center", padding:"60px 20px" }}>
-            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Activation GPS...</h2>
-            <p style={{ color:"#64748B", fontSize:14 }}>Autorisez l acces a votre position</p>
+        {/* REQUESTING */}
+        {phase === 'requesting' && (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ width: 40, height: 40, border: `2px solid ${C.greenBright}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 16, fontWeight: 500, color: C.textPrimary }}>Activation GPS...</div>
+            <div style={{ fontSize: 13, color: C.textTertiary, marginTop: 6 }}>Autorisez l'accès à votre position</div>
           </div>
         )}
 
-        {phase === "running" && (
-          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {/* RUNNING */}
+        {phase === 'running' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* ALERTE VITESSE */}
+            {/* Alerte vitesse */}
             {alerteVitesse && (
-              <div style={{ background:"#FEF2F2", border:"2px solid #EF4444", borderRadius:14, padding:"10px 16px", textAlign:"center", fontWeight:700, fontSize:13, color:"#DC2626", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+              <div style={{ background: C.redLight, border: `1px solid rgba(229,64,58,0.3)`, borderRadius: 14, padding: '12px 16px', textAlign: 'center', fontWeight: 600, fontSize: 13, color: C.redDark }}>
                 🚨 {alerteVitesse}
               </div>
             )}
 
-            {/* COMPTEUR VITESSE — style tableau de bord */}
-            <div style={{ background:alerteVitesse ? `linear-gradient(135deg,#991B1B,#DC2626)` : `linear-gradient(160deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius:24, padding:"20px 16px", textAlign:"center", position:"relative", overflow:"hidden" }}>
-              {/* Timer */}
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-                <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:20, padding:"4px 12px", display:"flex", alignItems:"center", gap:6 }}>
-                  <div style={{ width:8, height:8, borderRadius:"50%", background:"#EF4444", animation:"pulse 1s infinite" }} />
-                  <span style={{ color:"white", fontSize:12, fontWeight:700 }}>EN COURS</span>
+            {/* Compteur principal */}
+            <div style={{ background: alerteVitesse ? '#1a0a0a' : C.greenDeep, borderRadius: 24, padding: '22px 20px', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, background: `radial-gradient(circle, ${alerteVitesse ? 'rgba(229,64,58,0.15)' : 'rgba(62,189,111,0.15)'} 0%, transparent 70%)`, pointerEvents: 'none' }} />
+
+              {/* Timer + status */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 12px' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.red, animation: 'pulse 1s infinite' }} />
+                  <span style={{ color: 'white', fontSize: 12, fontWeight: 500 }}>EN COURS</span>
                 </div>
-                <span style={{ color:"rgba(255,255,255,0.7)", fontSize:14, fontWeight:700 }}>{formatDuration(duration)}</span>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 500, fontFamily: C.fontMono }}>{formatDuration(duration)}</span>
               </div>
 
-              {/* Vitesse principale */}
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:88, fontWeight:900, color:alerteVitesse ? "#FCA5A5" : "white", lineHeight:1, letterSpacing:"-4px" }}>{speedKmh}</div>
-                <div style={{ fontSize:16, color:"rgba(255,255,255,0.6)", marginTop:4 }}>km/h</div>
+              {/* Vitesse */}
+              <div style={{ textAlign: 'center', marginBottom: 16, position: 'relative', zIndex: 1 }}>
+                <div style={{ fontSize: 80, fontWeight: 300, color: alerteVitesse ? '#FF6B6B' : 'white', lineHeight: 1, fontFamily: C.fontMono, letterSpacing: '-4px' }}>{speedKmh}</div>
+                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>km/h</div>
               </div>
 
-              {/* Limite + Max */}
-              <div style={{ display:"flex", justifyContent:"center", gap:8 }}>
+              {/* Badges */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, position: 'relative', zIndex: 1 }}>
+                <div style={{ background: 'rgba(255,255,255,0.1)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 12px', fontSize: 12, color: C.amber }}>
+                  Max {speedMax} km/h
+                </div>
                 {limiteActuelle && (
-                  <div style={{ background:alerteVitesse ? "#EF4444" : "rgba(255,255,255,0.15)", borderRadius:20, padding:"6px 14px", display:"flex", alignItems:"center", gap:6 }}>
-                    <span style={{ fontSize:14 }}>🚦</span>
-                    <span style={{ color:"white", fontSize:12, fontWeight:700 }}>Limite {limiteActuelle} km/h</span>
+                  <div style={{ background: alerteVitesse ? 'rgba(229,64,58,0.3)' : 'rgba(255,255,255,0.1)', border: `0.5px solid ${alerteVitesse ? 'rgba(229,64,58,0.5)' : 'rgba(255,255,255,0.15)'}`, borderRadius: 20, padding: '5px 12px', fontSize: 12, color: 'white' }}>
+                    Limite {limiteActuelle} km/h
                   </div>
                 )}
-                <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, padding:"6px 14px", display:"flex", alignItems:"center", gap:6 }}>
-                  <span style={{ fontSize:14 }}>⚡</span>
-                  <span style={{ color:WAFA.or, fontSize:12, fontWeight:700 }}>Max {speedMax} km/h</span>
-                </div>
               </div>
             </div>
 
-            {/* KPIs — Distance + Score */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-              <div style={{ background:"white", borderRadius:16, padding:"16px", textAlign:"center", border:"0.5px solid #E2E8F0" }}>
-                <div style={{ fontSize:10, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", marginBottom:6 }}>DISTANCE</div>
-                <div style={{ fontSize:36, fontWeight:900, color:WAFA.vert, lineHeight:1 }}>{km.toFixed(2)}</div>
-                <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>kilomètres</div>
+            {/* KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: C.white, borderRadius: 16, padding: '16px', textAlign: 'center', border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px', marginBottom: 6 }}>DISTANCE</div>
+                <div style={{ fontSize: 34, fontWeight: 600, color: C.greenAccent, lineHeight: 1, fontFamily: C.fontMono }}>{km.toFixed(2)}</div>
+                <div style={{ fontSize: 12, color: C.textTertiary, marginTop: 4 }}>kilomètres</div>
               </div>
-              <div style={{ background:"white", borderRadius:16, padding:"16px", textAlign:"center", border:"0.5px solid #E2E8F0" }}>
-                <div style={{ fontSize:10, color:"#94A3B8", fontWeight:700, letterSpacing:"0.06em", marginBottom:6 }}>SCORE</div>
-                <div style={{ fontSize:36, fontWeight:900, color:scoreColor, lineHeight:1 }}>{score}</div>
-                <div style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>/100</div>
+              <div style={{ background: C.white, borderRadius: 16, padding: '16px', textAlign: 'center', border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px', marginBottom: 6 }}>SCORE</div>
+                <div style={{ fontSize: 34, fontWeight: 600, color: scoreColor, lineHeight: 1, fontFamily: C.fontMono }}>{score}</div>
+                <div style={{ fontSize: 12, color: C.textTertiary, marginTop: 4 }}>/100</div>
               </div>
             </div>
 
-            {/* INCIDENTS */}
-            <div style={{ background:"white", borderRadius:16, padding:"14px 16px", border:"0.5px solid #E2E8F0" }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"#94A3B8", letterSpacing:"0.06em", marginBottom:10 }}>INCIDENTS DÉTECTÉS</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+            {/* Incidents */}
+            <div style={{ background: C.white, borderRadius: 16, padding: '14px 16px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px', marginBottom: 12 }}>INCIDENTS DÉTECTÉS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 {[
-                  { label:"Freinages", val:events.filter(e=>e.type==="freinage").length, bg:"#FEF2F2", color:"#EF4444", icon:"🛑" },
-                  { label:"Accél.", val:events.filter(e=>e.type==="acceleration").length, bg:"#FEF3C7", color:WAFA.orDark, icon:"⚡" },
-                  { label:"Excès", val:excessVitesse, bg:"#FEF2F2", color:"#EF4444", icon:"🚨" },
-                ].map((inc,i) => (
-                  <div key={i} style={{ background:inc.bg, borderRadius:12, padding:"12px 8px", textAlign:"center" }}>
-                    <div style={{ fontSize:16, marginBottom:4 }}>{inc.icon}</div>
-                    <div style={{ fontSize:22, fontWeight:900, color:inc.color, lineHeight:1 }}>{inc.val}</div>
-                    <div style={{ fontSize:10, color:"#94A3B8", marginTop:3 }}>{inc.label}</div>
+                  { label: 'Freinages', val: events.filter(e => e.type === 'freinage').length, bg: C.redLight, color: C.redDark },
+                  { label: 'Accél.', val: events.filter(e => e.type === 'acceleration').length, bg: C.amberLight, color: C.amberDark },
+                  { label: 'Excès', val: excessVitesse, bg: C.redLight, color: C.redDark },
+                ].map((inc, i) => (
+                  <div key={i} style={{ background: inc.bg, borderRadius: 12, padding: '12px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 600, color: inc.color, lineHeight: 1, fontFamily: C.fontMono }}>{inc.val}</div>
+                    <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 3 }}>{inc.label}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* COÛT ESTIMÉ */}
-            <div style={{ background:`linear-gradient(135deg,${WAFA.orLight},#FEF9F0)`, borderRadius:14, padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", border:`1px solid ${WAFA.or}30` }}>
+            {/* Coût */}
+            <div style={{ background: C.amberLight, borderRadius: 14, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid rgba(245,166,35,0.2)` }}>
               <div>
-                <div style={{ fontSize:11, color:WAFA.orDark, fontWeight:700, marginBottom:2 }}>COÛT ESTIMÉ</div>
-                <div style={{ fontSize:11, color:"#94A3B8" }}>0,50 MAD/km</div>
+                <div style={{ fontSize: 11, color: C.amberDark, fontWeight: 500 }}>COÛT ESTIMÉ</div>
+                <div style={{ fontSize: 11, color: C.textTertiary }}>0,50 MAD/km</div>
               </div>
-              <div style={{ fontSize:22, fontWeight:900, color:WAFA.orDark }}>{(km * 0.5).toFixed(2)} MAD</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: C.amberDark, fontFamily: C.fontMono }}>{(km * 0.5).toFixed(2)} MAD</div>
             </div>
 
-            {/* BOUTON TERMINER */}
-            <button onClick={stopTrajet} style={{ width:"100%", padding:"18px", borderRadius:16, background:"linear-gradient(135deg,#991B1B,#DC2626)", color:"white", border:"none", fontWeight:900, fontSize:17, cursor:"pointer", boxShadow:"0 6px 20px rgba(220,38,38,0.35)", display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
-              ⏹ Terminer le trajet
+            <button onClick={stopTrajet} style={{ width: '100%', padding: '16px', borderRadius: 16, background: '#8B1A17', color: 'white', border: 'none', fontWeight: 600, fontSize: 16, cursor: 'pointer', fontFamily: C.fontSans }}>
+              Terminer le trajet
             </button>
-
-            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
           </div>
         )}
 
-        {phase === "stopped" && (
-          <div>
-            <div style={{ background:"white", borderRadius:24, padding:32, boxShadow:"0 4px 24px rgba(0,0,0,0.08)", marginBottom:16 }}>
-              <h2 style={{ fontSize:20, fontWeight:900, color:WAFA.noir, margin:"0 0 16px", textAlign:"center" }}>Résumé du trajet</h2>
-              {gpsPoints.current.length >= 2 ? (
-                <TrajetMapStrava
-                  points={gpsPoints.current}
-                  speedMax={speedMax}
-                  incidents={[
-                    ...accelEvents.current.filter(e => e.type === "freinage" && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: "freinage" as const })),
-                    ...accelEvents.current.filter(e => e.type === "acceleration" && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: "acceleration" as const })),
-                  ]}
-                  height={240}
-                  interactive={true}
-                />
-              ) : (
-                <div style={{ height:240, borderRadius:16, background:"linear-gradient(135deg,#1a2a1a,#2d4a2d)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.5)", marginBottom:16 }}>
-                  <span style={{ fontSize:40, marginBottom:8 }}>📍</span>
-                  <span style={{ fontSize:13 }}>Trajet trop court pour afficher la carte</span>
-                </div>
-              )}
-              <div style={{ background:score >= 80 ? `linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})` : score >= 60 ? `linear-gradient(135deg,${WAFA.orDark},${WAFA.or})` : "linear-gradient(135deg,#DC2626,#EF4444)", borderRadius:20, padding:"28px", textAlign:"center", marginBottom:24 }}>
-                <p style={{ color:"rgba(255,255,255,0.7)", fontSize:12, margin:"0 0 8px" }}>SCORE FINAL</p>
-                <div style={{ fontSize:72, fontWeight:900, color:"white", lineHeight:1 }}>{score}</div>
-                <div style={{ fontSize:16, color:"rgba(255,255,255,0.7)" }}>/100</div>
-                <div style={{ marginTop:12, fontSize:14, color:"white", fontWeight:700 }}>
-                  {score >= 90 ? "Excellent conducteur !" : score >= 80 ? "Bon conducteur" : score >= 60 ? "Conduite a ameliorer" : "Conduite dangereuse"}
-                </div>
+        {/* STOPPED */}
+        {phase === 'stopped' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* Carte GPS */}
+            {gpsPoints.current.length > 1 && (
+              <div style={{ borderRadius: 20, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                <TrajetMapStrava points={gpsPoints.current} speedMax={speedMax} incidents={[
+                  ...accelEvents.current.filter(e => e.type === 'freinage' && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: 'freinage' as const })),
+                  ...accelEvents.current.filter(e => e.type === 'acceleration' && e.lat).map(e => ({ lat: e.lat!, lng: e.lng!, type: 'acceleration' as const })),
+                ]} height={200} interactive={true} />
               </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:24 }}>
-                {[
-                  { val:`${km.toFixed(2)} km`, label:"Distance" },
-                  { val:formatDuration(duration), label:"Duree" },
-                  { val:`${speedMax} km/h`, label:"Vitesse max" },
-                  { val:events.filter(e=>e.type==="freinage").length, label:"Freinages" },
-                  { val:events.filter(e=>e.type==="acceleration").length, label:"Accel." },
-                  { val:excessVitesse, label:"Exces" },
-                ].map((s,i) => (
-                  <div key={i} style={{ background:WAFA.gris, borderRadius:12, padding:"14px 10px", textAlign:"center" }}>
-                    <div style={{ fontWeight:800, fontSize:14, color:WAFA.noir }}>{s.val}</div>
-                    <div style={{ fontSize:10, color:"#94A3B8", marginTop:2 }}>{s.label}</div>
-                  </div>
-                ))}
+            )}
+
+            {/* Score final */}
+            <div style={{ background: score >= 80 ? C.greenMid : score >= 60 ? C.amberDark : '#8B1A17', borderRadius: 20, padding: '24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.3px', marginBottom: 8 }}>SCORE FINAL</div>
+              <div style={{ fontSize: 64, fontWeight: 600, color: 'white', lineHeight: 1, fontFamily: C.fontMono }}>{score}</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>/100</div>
+              <div style={{ marginTop: 10, fontSize: 15, color: 'white', fontWeight: 500 }}>
+                {score >= 90 ? 'Excellent conducteur !' : score >= 80 ? 'Bon conducteur' : score >= 60 ? 'Conduite à améliorer' : 'Conduite dangereuse'}
               </div>
             </div>
-            {/* COACHING POST-TRAJET */}
-            <div style={{ marginTop:16, borderRadius:16, overflow:"hidden", border:"1px solid #E2E8F0" }}>
-              <div style={{ background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, padding:"10px 14px", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:16 }}>🧠</span>
-                <span style={{ color:"white", fontWeight:700, fontSize:13 }}>Coaching personnalisé</span>
+
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {[
+                { val: `${km.toFixed(2)}`, unit: 'km', label: 'Distance' },
+                { val: formatDuration(duration), unit: '', label: 'Durée' },
+                { val: `${speedMax}`, unit: 'km/h', label: 'Max' },
+                { val: String(events.filter(e=>e.type==='freinage').length), unit: '', label: 'Freinages' },
+                { val: String(events.filter(e=>e.type==='acceleration').length), unit: '', label: 'Accél.' },
+                { val: String(excessVitesse), unit: '', label: 'Excès' },
+              ].map((s, i) => (
+                <div key={i} style={{ background: C.white, borderRadius: 12, padding: '12px 8px', textAlign: 'center', border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>{s.val}{s.unit && <span style={{ fontSize: 10, color: C.textTertiary }}> {s.unit}</span>}</div>
+                  <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Coaching */}
+            <div style={{ background: C.amberLight, borderRadius: 16, border: `1px solid rgba(245,166,35,0.2)`, overflow: 'hidden' }}>
+              <div style={{ background: C.amberDark, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 14 }}>💡</span>
+                <span style={{ color: 'white', fontWeight: 600, fontSize: 13 }}>Coaching personnalisé</span>
               </div>
-              <div style={{ background:"white", padding:"12px 14px", display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(() => {
+                  const freinages = events.filter(e => e.type === 'freinage').length
+                  const accels = events.filter(e => e.type === 'acceleration').length
                   const conseils = []
-                  const freinages = events.filter(e => e.type === "freinage").length
-                  const accels = events.filter(e => e.type === "acceleration").length
-                  if (freinages > 5) conseils.push({ icon:"🛑", text:`${freinages} freinages brusques détectés. Anticipez les ralentissements en levant le pied plus tôt.`, color:"#FEF2F2", border:"#FECACA" })
-                  else if (freinages > 2) conseils.push({ icon:"⚠️", text:`${freinages} freinages détectés. Gardez une distance de sécurité suffisante.`, color:"#FFFBEB", border:"#FDE68A" })
-                  else conseils.push({ icon:"✅", text:"Excellente maîtrise du freinage ! Continuez à anticiper les ralentissements.", color:"#F0FDF4", border:"#86EFAC" })
-                  if (accels > 5) conseils.push({ icon:"⚡", text:`${accels} accélérations brusques. Une conduite plus progressive économise du carburant.`, color:"#FEF2F2", border:"#FECACA" })
-                  else conseils.push({ icon:"🌿", text:"Bonne gestion des accélérations. Votre conduite est économique.", color:"#F0FDF4", border:"#86EFAC" })
-                  if (excessVitesse > 10) conseils.push({ icon:"🚨", text:`${excessVitesse} excès de vitesse détectés ! Respectez les limites pour améliorer votre score.`, color:"#FEF2F2", border:"#FECACA" })
-                  else if (excessVitesse > 10) conseils.push({ icon:"🚨", text:`${excessVitesse} excès de vitesse détectés. Respectez les limites pour améliorer votre score.`, color:"#FEF2F2", border:"#FECACA" })
-                  else if (score >= 90) conseils.push({ icon:"🏅", text:`Score ${score}/100 — Excellent ! Vous bénéficiez de la réduction maximale -15%.`, color:"#F0FDF4", border:"#86EFAC" })
-                  else if (score >= 80) conseils.push({ icon:"📈", text:`Score ${score}/100 — Bon trajet ! Encore quelques points pour atteindre -15%.`, color:"#EFF6FF", border:"#BFDBFE" })
-                  else conseils.push({ icon:"💪", text:`Score ${score}/100 — Réduisez vos freinages pour améliorer votre score et votre prime.`, color:"#FFFBEB", border:"#FDE68A" })
+                  if (excessVitesse > 10) conseils.push({ icon: '🚨', text: `${excessVitesse} excès de vitesse. Respectez les limites pour protéger votre score.`, bg: C.redLight, color: C.redDark })
+                  else if (freinages > 5) conseils.push({ icon: '🛑', text: `${freinages} freinages brusques. Anticipez les ralentissements.`, bg: C.redLight, color: C.redDark })
+                  else if (freinages > 2) conseils.push({ icon: '⚠️', text: `${freinages} freinages détectés. Gardez vos distances.`, bg: C.amberLight, color: C.amberDark })
+                  else conseils.push({ icon: '✅', text: 'Excellente maîtrise du freinage ! Continuez à anticiper.', bg: 'rgba(62,189,111,0.1)', color: C.greenAccent })
+                  if (score >= 90) conseils.push({ icon: '🏅', text: `Score ${score}/100 — Vous bénéficiez de la réduction maximale -15%.`, bg: 'rgba(62,189,111,0.1)', color: C.greenAccent })
+                  else if (score >= 80) conseils.push({ icon: '📈', text: `Score ${score}/100 — Encore quelques points pour atteindre -15%.`, bg: C.blueLight, color: C.blue })
+                  else conseils.push({ icon: '💪', text: `Score ${score}/100 — Réduisez vos incidents pour améliorer votre prime.`, bg: C.amberLight, color: C.amberDark })
                   return conseils.map((c, i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"10px 12px", background:c.color, borderRadius:10, border:`1px solid ${c.border}` }}>
-                      <span style={{ fontSize:16, flexShrink:0 }}>{c.icon}</span>
-                      <span style={{ fontSize:12, color:"#374151", lineHeight:1.5 }}>{c.text}</span>
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: c.bg, borderRadius: 10 }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>{c.icon}</span>
+                      <span style={{ fontSize: 12, color: c.color, lineHeight: 1.5 }}>{c.text}</span>
                     </div>
                   ))
                 })()}
               </div>
             </div>
 
-            <div style={{ display:"flex", gap:12, marginTop:16 }}>
-              <button onClick={resetTrajet} style={{ flex:1, padding:"16px", borderRadius:14, border:`2px solid ${WAFA.vert}`, background:"white", color:WAFA.vert, fontWeight:700, fontSize:14, cursor:"pointer" }}>Nouveau</button>
-              <button onClick={saveTrajet} style={{ flex:2, padding:"16px", borderRadius:14, background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color:"white", border:"none", fontWeight:800, fontSize:14, cursor:"pointer" }}>Sauvegarder</button>
+            {/* WhatsApp share */}
+            <button onClick={() => {
+              const txt = `🚗 Mon trajet DriveScore — Score : ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD\n${score >= 90 ? '🏅 Excellent !' : score >= 80 ? '✅ Bon conducteur' : '💪 En progression'}\n👉 drivescore-eight.vercel.app`
+              window.open(`https://wa.me/?text=${encodeURIComponent(txt)}`, '_blank')
+            }} style={{ width: '100%', padding: '13px', borderRadius: 14, background: '#25D366', color: 'white', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+              📲 Partager sur WhatsApp
+            </button>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => navigate('/trajets')} style={{ flex: 1, padding: '14px', borderRadius: 14, border: `1px solid ${C.borderStrong}`, background: C.white, color: C.textSecondary, fontWeight: 500, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+                Mes trajets
+              </button>
+              <button onClick={saveTrajet} style={{ flex: 2, padding: '14px', borderRadius: 14, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+                Sauvegarder
+              </button>
             </div>
           </div>
         )}
 
-        {phase === "saving" && (
-          <div style={{ textAlign:"center", padding:"60px 20px" }}>
-            <div style={{ width:40, height:40, border:`3px solid ${WAFA.vert}`, borderTopColor:"transparent", borderRadius:"50%", animation:"spin 0.8s linear infinite", margin:"0 auto 16px" }} />
-            <h2 style={{ fontSize:16, fontWeight:700, color:WAFA.noir }}>Sauvegarde en cours...</h2>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        {/* SAVING */}
+        {phase === 'saving' && (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ width: 40, height: 40, border: `2px solid ${C.greenBright}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 16, fontWeight: 500, color: C.textPrimary }}>Sauvegarde en cours...</div>
           </div>
         )}
 
-        {phase === "saved" && (
-          <div style={{ textAlign:"center", padding:"48px 24px" }}>
-            <div style={{ fontSize:72, marginBottom:16 }}>✅</div>
-            <div style={{ fontSize:22, fontWeight:900, color:WAFA.vert, marginBottom:8 }}>Trajet enregistré !</div>
-            <div style={{ fontSize:14, color:"#64748B", marginBottom:32 }}>Score : {score}/100</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              <button onClick={() => { resetTrajet(); }} style={{ padding:"16px", borderRadius:14, background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color:"white", border:"none", fontWeight:800, fontSize:15, cursor:"pointer" }}>
-                🚗 Nouveau trajet
-              </button>
-              <button onClick={() => navigate("/trajets")} style={{ padding:"16px", borderRadius:14, border:`2px solid ${WAFA.vert}`, background:"white", color:WAFA.vert, fontWeight:700, fontSize:15, cursor:"pointer" }}>
-                📋 Voir mes trajets
-              </button>
-              <button onClick={() => navigate("/dashboard")} style={{ padding:"14px", borderRadius:14, border:`1px solid #E2E8F0`, background:"white", color:"#64748B", fontWeight:600, fontSize:14, cursor:"pointer" }}>
-                🏠 Tableau de bord
-              </button>
-            </div>
+        {/* SAVED */}
+        {phase === 'saved' && (
+          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: C.textPrimary }}>Trajet sauvegardé !</div>
+            <div style={{ fontSize: 13, color: C.textTertiary, marginTop: 6 }}>Redirection vers le tableau de bord...</div>
           </div>
         )}
       </div>
