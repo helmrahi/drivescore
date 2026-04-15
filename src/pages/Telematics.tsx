@@ -45,6 +45,12 @@ export default function Telematics() {
 
   async function saveTrajet() {
     if (!profile?.pseudo_id) { navigate('/login'); return }
+    if (!Number.isFinite(km) || km <= 0) {
+      if (setError) setError('Distance invalide, impossible de sauvegarder le trajet.')
+      setTimeout(() => { if (setError) setError('') }, 4000)
+      setPhase('stopped')
+      return
+    }
     if (km < 0.5) {
       const ok = window.confirm(`Trajet très court (${km.toFixed(2)} km). Sauvegarder quand même ?`)
       if (!ok) { resetTrajet(); return }

@@ -2,8 +2,13 @@
 // SERVICE TRAJET — CRUD trajets Supabase
 // ============================================
 
+
 import { supabase } from '../lib/supabase'
 import { Trajet } from '../types'
+
+function isValidKm(km: any): boolean {
+  return typeof km === 'number' && isFinite(km) && km > 0;
+}
 
 export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]> {
   const { data, error } = await supabase
@@ -17,6 +22,9 @@ export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]
 }
 
 export async function insertTrajet(trajet: Omit<Trajet, 'id' | 'created_at'>): Promise<{ success: boolean; error?: string }> {
+  if (!isValidKm(trajet.km)) {
+    return { success: false, error: "Le nombre de kilomètres doit être strictement positif." };
+  }
   const { error } = await supabase.from('trajets').insert(trajet)
   if (error) return { success: false, error: error.message }
   return { success: true }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { insertTrajet } from '../services/trajetService'
 import TrajetMapStrava from '../components/TrajetMapStrava'
 
 const W = {
@@ -77,9 +78,18 @@ function MiniMap({ trajet }: { trajet: any }) {
 export default function Trajets() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [form, setForm] = useState({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
+  const [form, setForm] = useState<{
+    km: string
+    type_route: 'ville' | 'route' | 'autoroute' | 'mixte'
+    ville_depart: string
+    ville_arrivee: string
+    conduite_nocturne: boolean
+    freinages_brusques: number
+    exces_vitesse_count: number
+  }>({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
   const [trajets, setTrajets] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -104,24 +114,54 @@ export default function Trajets() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setError('')
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { navigate('/login'); return }
-    const { data: p } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
-    if (p) {
-      const km = parseFloat(form.km)
-      await supabase.from('trajets').insert({
-        pseudo_id: p.pseudo_id, km, type_route: form.type_route,
-        ville_depart: form.ville_depart, ville_arrivee: form.ville_arrivee,
-        conduite_nocturne: form.conduite_nocturne,
-        freinages_brusques: form.freinages_brusques,
-        exces_vitesse_count: form.exces_vitesse_count,
-        score_trajet: score, cout_mad: parseFloat((km * 0.5).toFixed(2)),
-        date_trajet: new Date().toISOString().split('T')[0]
-      })
-      setSuccess(true); setShowForm(false)
-      setForm({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
-      setTimeout(() => setSuccess(false), 3000)
+    if (!user) {
+      setLoading(false)
+      navigate('/login')
+      return
     }
+
+    const { data: p } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
+    if (!p) {
+      setError('Impossible de trouver votre profil. Réessayez plus tard.')
+      setLoading(false)
+      return
+    }
+
+    const km = parseFloat(form.km)
+    if (!Number.isFinite(km) || km <= 0) {
+      setError('Veuillez saisir une distance valide supérieure à 0 km.')
+      setLoading(false)
+      return
+    }
+
+    const result = await insertTrajet({
+      pseudo_id: p.pseudo_id,
+      km,
+      type_route: form.type_route,
+      ville_depart: form.ville_depart,
+      ville_arrivee: form.ville_arrivee,
+      conduite_nocturne: form.conduite_nocturne,
+      freinages_brusques: form.freinages_brusques,
+      exces_vitesse_count: form.exces_vitesse_count,
+      score_trajet: score,
+      cout_mad: parseFloat((km * 0.5).toFixed(2)),
+      date_trajet: new Date().toISOString().split('T')[0],
+    })
+
+    if (!result.success) {
+      setError('Erreur sauvegarde : ' + result.error)
+      setLoading(false)
+      setTimeout(() => setError(''), 4000)
+      return
+    }
+
+    setSuccess(true)
+    setShowForm(false)
+    setForm({ km: '', type_route: 'ville', ville_depart: '', ville_arrivee: '', conduite_nocturne: false, freinages_brusques: 0, exces_vitesse_count: 0 })
+    setTimeout(() => setSuccess(false), 3000)
     setLoading(false)
   }
 
@@ -170,6 +210,12 @@ export default function Trajets() {
         {success && (
           <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12, padding: '12px', marginBottom: 12, color: W.vert, fontWeight: 600, fontSize: 14, textAlign: 'center' }}>
             ✅ Trajet enregistré — Score : {score}/100
+          </div>
+        )}
+
+        {error && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: '12px', marginBottom: 12, color: '#B91C1C', fontWeight: 600, fontSize: 14, textAlign: 'center' }}>
+            ⚠ {error}
           </div>
         )}
 
@@ -224,7 +270,7 @@ export default function Trajets() {
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6, letterSpacing: '0.06em' }}>TYPE DE ROUTE</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
                   {[{ id: 'ville', label: '🏙️', sub: 'Ville' }, { id: 'route', label: '🛣️', sub: 'Route' }, { id: 'autoroute', label: '🚀', sub: 'Auto' }, { id: 'mixte', label: '🔀', sub: 'Mixte' }].map(t => (
-                    <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, type_route: t.id }))}
+                    <button key={t.id} type="button" onClick={() => setForm(f => ({ ...f, type_route: t.id as 'ville' | 'route' | 'autoroute' | 'mixte' }))}
                       style={{ padding: '10px 4px', borderRadius: 10, border: `2px solid ${form.type_route === t.id ? W.vert : W.grisMid}`, background: form.type_route === t.id ? '#F0FDF4' : 'white', cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s' }}>
                       <div style={{ fontSize: 20 }}>{t.label}</div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: form.type_route === t.id ? W.vert : '#94A3B8', marginTop: 2 }}>{t.sub}</div>
