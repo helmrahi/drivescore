@@ -183,13 +183,8 @@ export function useTelematics() {
     setScore(result.score)
     // Vérifier durée minimum 2 minutes
     if (duration < 120) {
-      alert('Trajet trop court (moins de 2 minutes). Non comptabilisé.')
-      resetTrajet()
-      return
-    }
-    // Vérifier durée minimum 2 minutes
-    if (duration < 120) {
-      alert('Trajet trop court (moins de 2 minutes). Non comptabilisé.')
+      setError('Trajet trop court (moins de 2 minutes). Non comptabilisé.')
+      setTimeout(() => setError(''), 3500)
       resetTrajet()
       return
     }

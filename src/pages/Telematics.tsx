@@ -83,7 +83,17 @@ export default function Telematics() {
       </header>
 
       <div style={{ maxWidth:480, margin:"0 auto", padding:"24px 16px" }}>
-        {error && <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", color:"#DC2626", padding:"14px 18px", borderRadius:14, marginBottom:20, fontSize:13 }}>!! {error}</div>}
+        {error && (
+          <div style={{
+            position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+            background: '#1E293B', color: 'white',
+            padding: '12px 20px', borderRadius: 14, fontSize: 13, fontWeight: 600,
+            zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            maxWidth: 320, textAlign: 'center',
+          }}>
+            ⏱️ {error}
+          </div>
+        )}
 
         {phase === "saving" && <div style={{ background:"#F0FDF4", border:"1px solid #86EFAC", color:WAFA.vert, padding:"16px", borderRadius:14, marginBottom:20, fontSize:14, fontWeight:700, textAlign:"center" }}>Trajet sauvegarde ! Redirection...</div>}
 

@@ -210,24 +210,28 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* TRAJETS */}
+        {/* RACCOURCI TRAJETS */}
         <div style={{ padding: "0 16px 12px" }}>
-          <div style={{ background: "white", borderRadius: 16, border: `0.5px solid ${W.grisMid}`, overflow: "hidden" }}>
-
-            {/* Header + filtres période */}
-            <div style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `0.5px solid #F1F5F9` }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>Mes trajets</span>
-              <div style={{ display: "flex", gap: 4 }}>
-                {(["semaine", "mois", "tout"] as const).map(p => (
-                  <button key={p} onClick={() => setPeriode(p)} style={{
-                    fontSize: 10, padding: "3px 9px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 600,
-                    background: periode === p ? W.vert : "#F1F5F9",
-                    color: periode === p ? "white" : "#64748B",
-                  }}>
-                    {p === "semaine" ? "7j" : p === "mois" ? "Mois" : "Tout"}
-                  </button>
-                ))}
+          <button
+            onClick={() => navigate('/trajets')}
+            style={{
+              width: '100%', background: 'white', border: `0.5px solid ${W.grisMid}`,
+              borderRadius: 16, padding: '14px 18px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>📋</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: W.noir }}>Mes trajets</div>
+                <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                  {trajetsFiltres.length} trajet{trajetsFiltres.length > 1 ? 's' : ''} ce mois
+                </div>
               </div>
+            </div>
+            <span style={{ fontSize: 18, color: '#CBD5E1' }}>›</span>
+          </button>
+        </div>
             </div>
 
             {/* Liste trajets */}

@@ -288,7 +288,20 @@ export default function Trajets() {
 
                 {/* MINIATURE CARTE */}
                 <div style={{ height: 120, position: 'relative', background: '#E8F4E8' }}>
-                  <TrajetMapStrava points={t.gps_points || []} speedMax={t.vitesse_max || 0} height={120} interactive={false} />
+                  {(t.gps_points || []).length > 1 ? (
+                    <TrajetMapStrava points={t.gps_points} speedMax={t.vitesse_max || 0} height={120} interactive={false} />
+                  ) : (
+                    <div style={{
+                      height: 120, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      background: 'linear-gradient(135deg,#E8F4E8,#F0FDF4)',
+                      color: '#94A3B8',
+                    }}>
+                      <span style={{ fontSize: 28, marginBottom: 4 }}>🗺️</span>
+                      <span style={{ fontSize: 11 }}>Pas de données GPS</span>
+                      <span style={{ fontSize: 10, marginTop: 2, color: '#CBD5E1' }}>Trajet déclaré manuellement</span>
+                    </div>
+                  )}
                   {/* Score badge */}
                   <div style={{ position: 'absolute', top: 10, right: 10, background: sc(t.score_trajet), color: 'white', borderRadius: 20, padding: '5px 12px', fontSize: 13, fontWeight: 800, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>
                     {t.score_trajet}/100
