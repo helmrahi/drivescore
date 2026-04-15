@@ -39,6 +39,7 @@ export function useTelematics() {
   const accelEvents = useRef<AccelEvent[]>([])
   const excessRef = useRef(0)
   const excesGravesRef = useRef(0)
+  const excesGravesRef = useRef(0)
   const speedMaxRef = useRef(0)
 
   useEffect(() => {
@@ -180,6 +181,12 @@ export function useTelematics() {
     if (timerRef.current) clearInterval(timerRef.current)
     const result = calculerScore(accelEvents.current, speedMaxRef.current, excessRef.current)
     setScore(result.score)
+    // Vérifier durée minimum 2 minutes
+    if (duration < 120) {
+      alert('Trajet trop court (moins de 2 minutes). Non comptabilisé.')
+      resetTrajet()
+      return
+    }
     // Vérifier durée minimum 2 minutes
     if (duration < 120) {
       alert('Trajet trop court (moins de 2 minutes). Non comptabilisé.')

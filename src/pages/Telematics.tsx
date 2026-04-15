@@ -30,6 +30,11 @@ export default function Telematics() {
       const confirm = window.confirm(`Trajet très court (${km.toFixed(2)} km). Voulez-vous quand même sauvegarder ?`)
       if (!confirm) { resetTrajet(); return }
     }
+    // Vérifier distance minimum 500m
+    if (km < 0.5) {
+      const confirm = window.confirm(`Trajet très court (${km.toFixed(2)} km). Voulez-vous quand même sauvegarder ?`)
+      if (!confirm) { resetTrajet(); return }
+    }
     if (!profile?.pseudo_id) { navigate("/login"); return }
     setPhase("saving")
     // Échantillonner les points GPS — 1 point toutes les 5 secondes max
