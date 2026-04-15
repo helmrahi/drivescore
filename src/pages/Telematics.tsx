@@ -61,6 +61,7 @@ export default function Telematics() {
       return
     }
     setPhase("saved")
+    setTimeout(() => navigate("/dashboard"), 2000)
   }
 
   return (
