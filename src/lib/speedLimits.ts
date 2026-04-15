@@ -120,10 +120,12 @@ export function getSeuilAcceleration(typeRoute: 'ville' | 'route' | 'autoroute')
 // Vérifie si en excès de vitesse avec tolérance intelligente
 export function estEnExces(vitesseActuelle: number, limite: number, typeRoute?: 'ville' | 'route' | 'autoroute'): boolean {
   // Filtre anti faux positifs OSM autoroute
-  // Si on roule vite et OSM retourne une limite de ville → ignorer
   if (vitesseActuelle > 90 && limite < 80) return false
+  // Filtre anti faux positifs — ignorer limites aberrantes
+  if (limite <= 0 || limite > 200) return false
   const tolerance = getToleranceVitesse(typeRoute || 'ville')
-  return vitesseActuelle > limite + tolerance
+  const enExces = vitesseActuelle > limite + tolerance
+  return enExces
 }
 
 // Message d'alerte

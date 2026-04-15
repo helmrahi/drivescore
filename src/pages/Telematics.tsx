@@ -27,6 +27,15 @@ export default function Telematics() {
   async function saveTrajet() {
     if (!profile?.pseudo_id) { navigate("/login"); return }
     setPhase("saving")
+    // Échantillonner les points GPS — 1 point toutes les 5 secondes max
+    const allPoints = gpsPoints.current
+    const sampledPoints = allPoints.filter((_, i) => i % 5 === 0).slice(0, 150).map(p => ({
+      lat: parseFloat(p.lat.toFixed(5)),
+      lng: parseFloat(p.lng.toFixed(5)),
+      speed: Math.round(p.speed * 3.6),
+      timestamp: p.timestamp,
+    }))
+
     const result = await insertTrajet({
       pseudo_id: profile.pseudo_id,
       km,
@@ -40,19 +49,14 @@ export default function Telematics() {
       score_trajet: score,
       cout_mad: +(km * 0.5).toFixed(2),
       date_trajet: new Date().toISOString().split("T")[0],
-      gps_points: gpsPoints.current.slice(-500).map(p => ({
-        lat: parseFloat(p.lat.toFixed(6)),
-        lng: parseFloat(p.lng.toFixed(6)),
-        speed: Math.round(p.speed * 3.6),
-        timestamp: p.timestamp,
-      })),
+      gps_points: sampledPoints,
     })
     if (!result.success) {
       alert("Erreur sauvegarde : " + result.error)
       setPhase("stopped")
       return
     }
-    setTimeout(() => navigate("/dashboard"), 2000)
+    navigate("/dashboard")
   }
 
   return (
@@ -139,7 +143,7 @@ export default function Telematics() {
             )}
 
             {/* COMPTEUR VITESSE — style tableau de bord */}
-            <div style={{ background:`linear-gradient(160deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius:24, padding:"20px 16px", textAlign:"center", position:"relative", overflow:"hidden" }}>
+            <div style={{ background:alerteVitesse ? `linear-gradient(135deg,#991B1B,#DC2626)` : `linear-gradient(160deg,${WAFA.vertDark},${WAFA.vert})`, borderRadius:24, padding:"20px 16px", textAlign:"center", position:"relative", overflow:"hidden" }}>
               {/* Timer */}
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
                 <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:20, padding:"4px 12px", display:"flex", alignItems:"center", gap:6 }}>
