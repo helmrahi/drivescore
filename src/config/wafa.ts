@@ -25,34 +25,21 @@ export const PRICING = {
   reductionMoyen: 0.05,   // -5% si score >= 70
 } as const
 
-// Seuils de score
-export const SCORE_THRESHOLDS = {
-  elite: 95,
-  excellent: 90,
-  bon: 80,
-  moyen: 70,
-  faible: 60,
-} as const
+// Seuils télématique — specs validées
+  seuilFreinageBrusque: 9.0,     // ville (m/s²)
+  seuilFreinageRoute: 8.5,       // route nationale
+  seuilFreinageAutoroute: 7.5,   // autoroute
+  seuilUrgence: 12.0,            // freinage d'urgence tous types
+  seuilAccelVille: 8.0,          // accélération brusque ville
+  seuilAccelRoute: 7.0,          // accélération brusque route
+  seuilAccelAutoroute: 6.0,      // accélération brusque autoroute
+  toleranceVille: 5,             // km/h tolérance excès ville
+  toleranceRoute: 8,             // km/h tolérance excès route
+  toleranceAutoroute: 10,        // km/h tolérance excès autoroute
+  nocturneDébut: 22,             // heure début nocturne
+  nocturneFin: 5,                // heure fin nocturne
+  trajetMinKm: 0.5,              // km minimum trajet valide
+  trajetMinDuration: 120,        // secondes minimum trajet valide
+  referenceClassique: 500,       // MAD prime assurance classique
 
-// Seuils télématique
-export const TELEMATICS = {
-  seuilFreinage: 9,        // magnitude accéléromètre ville (défaut)
-  seuilFreinageRoute: 8.5, // magnitude route nationale
-  seuilFreinageAutoroute: 7.5, // magnitude autoroute
-  seuilAccelVille: 8.0,    // accélération brusque ville
-  seuilAccelRoute: 7.0,    // accélération brusque route
-  seuilAccelAutoroute: 6.0, // accélération brusque autoroute
-  seuilUrgence: 12.0,      // freinage d'urgence tous types
-  delaiEntreEvents: 2000,  // ms entre deux détections
-  toleranceVitesse: 2,     // km/h de tolérance excès
-  distanceMinGPS: 0.005,   // km minimum entre 2 points GPS
-} as const
 
-// Informations légales
-export const LEGAL = {
-  societe: 'Wafa Assurance',
-  agrement: 'ACAPS',
-  loi: 'CNDP Loi 09-08',
-  hebergement: 'Europe (Frankfurt)',
-  annee: 2026,
-} as const

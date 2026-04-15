@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { GpsPoint, AccelEvent, TelematicsPhase } from '../types'
 import { calculerScore } from '../services/scoringService'
-import { getLimiteVitesse, estEnExces, messageAlerte, detecterTypeRoute, getSeuilFreinage, getSeuilAcceleration } from '../lib/speedLimits'
+import { getLimiteVitesse, estEnExces, messageAlerte, detecterTypeRoute, getSeuilFreinage, getSeuilAcceleration, excesGrave } from '../lib/speedLimits'
 import { TELEMATICS } from '../config/wafa'
 
 function calcDistance(p1: GpsPoint, p2: GpsPoint): number {
@@ -38,6 +38,7 @@ export function useTelematics() {
   const lastAccel = useRef({ x: 0, y: 0, z: 0, t: 0 })
   const accelEvents = useRef<AccelEvent[]>([])
   const excessRef = useRef(0)
+  const excesGravesRef = useRef(0)
   const speedMaxRef = useRef(0)
 
   useEffect(() => {
@@ -109,6 +110,7 @@ export function useTelematics() {
     gpsPoints.current = []
     accelEvents.current = []
     excessRef.current = 0
+    excesGravesRef.current = 0
     speedMaxRef.current = 0
     setKm(0); setSpeedKmh(0); setSpeedMax(0); setDuration(0)
     setEvents([]); setLimiteActuelle(null); setAlerteVitesse(''); setExcessVitesse(0)
@@ -136,8 +138,11 @@ export function useTelematics() {
             if (estEnExces(currentSpeedKmh, limite.limite, typeRoute)) {
               setAlerteVitesse(messageAlerte(currentSpeedKmh, limite.limite))
               excessRef.current += 1
+              if (excesGrave(currentSpeedKmh, limite.limite, typeRoute)) {
+                excesGravesRef.current += 1
+              }
               setExcessVitesse(excessRef.current)
-              const result = calculerScore(accelEvents.current, speedMaxRef.current, excessRef.current)
+              const result = calculerScore(accelEvents.current, speedMaxRef.current, excessRef.current, excesGravesRef.current)
               setScore(result.score)
             } else {
               setAlerteVitesse('')
@@ -175,6 +180,12 @@ export function useTelematics() {
     if (timerRef.current) clearInterval(timerRef.current)
     const result = calculerScore(accelEvents.current, speedMaxRef.current, excessRef.current)
     setScore(result.score)
+    // Vérifier durée minimum 2 minutes
+    if (duration < 120) {
+      alert('Trajet trop court (moins de 2 minutes). Non comptabilisé.')
+      resetTrajet()
+      return
+    }
     setPhase('stopped')
   }
 
@@ -186,6 +197,7 @@ export function useTelematics() {
     gpsPoints.current = []
     accelEvents.current = []
     excessRef.current = 0
+    excesGravesRef.current = 0
     speedMaxRef.current = 0
   }
 
