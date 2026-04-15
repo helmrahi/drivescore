@@ -26,20 +26,22 @@ export const PRICING = {
 } as const
 
 // Seuils télématique — specs validées
-  seuilFreinageBrusque: 9.0,     // ville (m/s²)
-  seuilFreinageRoute: 8.5,       // route nationale
-  seuilFreinageAutoroute: 7.5,   // autoroute
-  seuilUrgence: 12.0,            // freinage d'urgence tous types
-  seuilAccelVille: 8.0,          // accélération brusque ville
-  seuilAccelRoute: 7.0,          // accélération brusque route
-  seuilAccelAutoroute: 6.0,      // accélération brusque autoroute
-  toleranceVille: 5,             // km/h tolérance excès ville
-  toleranceRoute: 8,             // km/h tolérance excès route
-  toleranceAutoroute: 10,        // km/h tolérance excès autoroute
-  nocturneDebut: 22,             // heure début nocturne
-  nocturneFin: 5,                // heure fin nocturne
-  trajetMinKm: 0.5,              // km minimum trajet valide
-  trajetMinDuration: 120,        // secondes minimum trajet valide
-  referenceClassique: 500,       // MAD prime assurance classique
+export const TELEMATICS = {
+  seuilFreinageBrusque: 9.0,
+  seuilFreinageRoute: 8.5,
+  seuilFreinageAutoroute: 7.5,
+  seuilUrgence: 12.0,
+  seuilAccelVille: 8.0,
+  seuilAccelRoute: 7.0,
+  seuilAccelAutoroute: 6.0,
+  toleranceVille: 5,
+  toleranceRoute: 8,
+  toleranceAutoroute: 10,
+  nocturneDebut: 22,
+  nocturneFin: 5,
+  trajetMinKm: 0.5,
+  trajetMinDuration: 120,
+  referenceClassique: 500,
+} as const
 
 
