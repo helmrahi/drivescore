@@ -14,6 +14,7 @@ export interface Profile {
   consentement_gps: boolean
   consentement_marketing: boolean
   afficher_leaderboard: boolean
+  avatar_url?: string
   created_at?: string
 }
 
