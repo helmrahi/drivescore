@@ -80,7 +80,7 @@ export default function CommentCaMarche() {
             { score: '90+', label: 'Excellent conducteur', sub: 'Conduite exemplaire', reduction: '-15%', color: C.greenBright, bg: 'rgba(62,189,111,0.08)' },
             { score: '80-89', label: 'Bon conducteur', sub: 'Très peu d'incidents', reduction: '-10%', color: C.greenAccent, bg: 'rgba(42,138,80,0.06)' },
             { score: '70-79', label: 'Conducteur moyen', sub: 'Quelques comportements à améliorer', reduction: '-5%', color: C.amber, bg: C.amberLight },
-            { score: '<70', label: 'À améliorer', sub: 'Conduite risquée détectée', reduction: '0%', color: C.red, bg: C.redLight },
+            { score: "< 70", label: 'À améliorer', sub: 'Conduite risquée détectée', reduction: '0%', color: C.red, bg: C.redLight },
           ].map((r, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, marginBottom: 6, background: r.bg }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: r.color, minWidth: 44, fontFamily: C.fontMono }}>{r.score}</div>
