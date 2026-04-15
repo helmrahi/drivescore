@@ -36,7 +36,7 @@ export const PRICING = {
   toleranceVille: 5,             // km/h tolérance excès ville
   toleranceRoute: 8,             // km/h tolérance excès route
   toleranceAutoroute: 10,        // km/h tolérance excès autoroute
-  nocturneDébut: 22,             // heure début nocturne
+  nocturneDebut: 22,             // heure début nocturne
   nocturneFin: 5,                // heure fin nocturne
   trajetMinKm: 0.5,              // km minimum trajet valide
   trajetMinDuration: 120,        // secondes minimum trajet valide
