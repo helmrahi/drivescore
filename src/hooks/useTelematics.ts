@@ -39,7 +39,7 @@ export function useTelematics() {
   const accelEvents = useRef<AccelEvent[]>([])
   const excessRef = useRef(0)
   const excesGravesRef = useRef(0)
-  const excesGravesRef = useRef(0)
+  
   const speedMaxRef = useRef(0)
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function useTelematics() {
       const accel = e.accelerationIncludingGravity
       if (!accel?.x || !accel?.y || !accel?.z) return
       const now = Date.now()
-      if (now - lastAccel.current.t < TELEMATICS.delaiEntreEvents) return
+      if (now - lastAccel.current.t < 2000) return
 
       const dx = Math.abs(accel.x - lastAccel.current.x)
       const dy = Math.abs(accel.y - lastAccel.current.y)
