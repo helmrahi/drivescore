@@ -83,6 +83,7 @@ export default function Trajets() {
   const [trajets, setTrajets] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [filtre, setFiltre] = useState<'tous' | 'incident' | 'nocturne' | 'parfait' | 'long'>('tous')
 
   const score = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 5 - (form.conduite_nocturne ? 5 : 0))
 
