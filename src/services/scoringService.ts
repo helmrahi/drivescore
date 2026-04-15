@@ -60,6 +60,7 @@ export function calculerScore(
     freinages,
     accelerations,
     exces,
+    speedMax,
   }
 }
 

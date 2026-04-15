@@ -154,7 +154,7 @@ export function useTelematics() {
         if (gpsPoints.current.length > 0) {
           const last = gpsPoints.current[gpsPoints.current.length - 1]
           const dist = calcDistance(last, point)
-          if (dist > TELEMATICS.distanceMinGPS) {
+          if (dist > TELEMATICS.trajetMinKm) {
             gpsPoints.current.push(point)
             const total = gpsPoints.current.reduce((sum, p, i) => {
               if (i === 0) return 0

@@ -45,3 +45,11 @@ export const TELEMATICS = {
 } as const
 
 
+
+// Seuils score
+export const SCORE_THRESHOLDS = {
+  excellent: 90,
+  bon: 80,
+  moyen: 70,
+  faible: 60,
+} as const
