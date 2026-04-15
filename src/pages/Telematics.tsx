@@ -66,7 +66,7 @@ export default function Telematics() {
       setPhase("stopped")
       return
     }
-    navigate("/dashboard")
+    setPhase("saved")
   }
 
   return (
@@ -322,7 +322,28 @@ export default function Telematics() {
 
         {phase === "saving" && (
           <div style={{ textAlign:"center", padding:"60px 20px" }}>
-            <h2 style={{ fontSize:20, fontWeight:700, color:WAFA.noir }}>Sauvegarde...</h2>
+            <div style={{ width:40, height:40, border:`3px solid ${WAFA.vert}`, borderTopColor:"transparent", borderRadius:"50%", animation:"spin 0.8s linear infinite", margin:"0 auto 16px" }} />
+            <h2 style={{ fontSize:16, fontWeight:700, color:WAFA.noir }}>Sauvegarde en cours...</h2>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        )}
+
+        {phase === "saved" && (
+          <div style={{ textAlign:"center", padding:"48px 24px" }}>
+            <div style={{ fontSize:72, marginBottom:16 }}>✅</div>
+            <div style={{ fontSize:22, fontWeight:900, color:WAFA.vert, marginBottom:8 }}>Trajet enregistré !</div>
+            <div style={{ fontSize:14, color:"#64748B", marginBottom:32 }}>Score : {score}/100</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              <button onClick={() => { resetTrajet(); }} style={{ padding:"16px", borderRadius:14, background:`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`, color:"white", border:"none", fontWeight:800, fontSize:15, cursor:"pointer" }}>
+                🚗 Nouveau trajet
+              </button>
+              <button onClick={() => navigate("/trajets")} style={{ padding:"16px", borderRadius:14, border:`2px solid ${WAFA.vert}`, background:"white", color:WAFA.vert, fontWeight:700, fontSize:15, cursor:"pointer" }}>
+                📋 Voir mes trajets
+              </button>
+              <button onClick={() => navigate("/dashboard")} style={{ padding:"14px", borderRadius:14, border:`1px solid #E2E8F0`, background:"white", color:"#64748B", fontWeight:600, fontSize:14, cursor:"pointer" }}>
+                🏠 Tableau de bord
+              </button>
+            </div>
           </div>
         )}
       </div>
