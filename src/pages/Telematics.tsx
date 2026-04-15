@@ -12,7 +12,7 @@ export default function Telematics() {
   const {
     phase, setPhase, km, speedKmh, speedMax, duration,
     events, score, limiteActuelle, alerteVitesse,
-    excessVitesse, error, accelEvents, excessRef,
+    excessVitesse, error, setError, accelEvents, excessRef,
     startTrajet, stopTrajet, resetTrajet, gpsPoints,
   } = useTelematics()
 
