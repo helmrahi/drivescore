@@ -36,7 +36,7 @@ export default function Leaderboard() {
   async function load() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setLoading(false); return }
     const { data: myProfile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
     if (myProfile) setMyPseudoId(myProfile.pseudo_id)
     const [trajets, profiles] = await Promise.all([getAllTrajets(), getAllProfiles()])
