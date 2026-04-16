@@ -191,7 +191,7 @@ export default function Leaderboard() {
             {/* PODIUM TOP 3 */}
             {top3.length >= 2 && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 4 }}>
-                {[top3[1], top3[0], top3[2]].filter(Boolean).map((d: any, idx: number) => {
+                {(top3.length === 1 ? [top3[0]] : top3.length === 2 ? [top3[1], top3[0]] : [top3[1], top3[0], top3[2]]).filter(Boolean).map((d: any, idx: number) => {
                   const isFirst = d.rank === 1
                   const isMe = d.pseudo_id === myId
                   return (
