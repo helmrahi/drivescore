@@ -37,28 +37,36 @@ export default function Trajets() {
 
   const scoreEstime = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 3)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) load(session.user.id)
+    })
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) load(session.user.id)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
-  async function load() {
+  async function load(userId?: string) {
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) { setLoading(false); return }
-      // Chercher pseudo_id dans profiles
+      let uid = userId
+      if (!uid) {
+        const { data: { session } } = await supabase.auth.getSession()
+        uid = session?.user?.id
+      }
+      if (!uid) { setLoading(false); return }
       const { data: p } = await supabase
         .from('profiles').select('pseudo_id')
-        .eq('id', session.user.id).single()
+        .eq('id', uid).single()
       if (!p?.pseudo_id) { setLoading(false); return }
-      // Charger tous les trajets
       const { data: t } = await supabase
         .from('trajets').select('*')
         .eq('pseudo_id', p.pseudo_id)
         .order('date_trajet', { ascending: false })
         .limit(100)
       setTrajets(t || [])
-    } catch(e) {
-      console.error('load error:', e)
-    }
+    } catch(e) { console.error('load error:', e) }
     setLoading(false)
   }
 
