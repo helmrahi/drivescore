@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import TrajetMapStrava from '../components/TrajetMapStrava'
 
 const C = {
@@ -28,6 +29,7 @@ function fmtDate(d: string) {
 export default function Trajets() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useAuth()
   const [trajets, setTrajets] = useState<any[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [filtre, setFiltre] = useState<'tous'|'incident'|'nocturne'|'parfait'|'long'>('tous')
@@ -38,14 +40,21 @@ export default function Trajets() {
   const scoreEstime = Math.max(0, 100 - form.freinages_brusques * 3 - form.exces_vitesse_count * 3)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) load(session.user.id)
-    })
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) load(session.user.id)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+    if (profile?.pseudo_id) loadByPseudoId(profile.pseudo_id)
+  }, [profile?.pseudo_id])
+
+  async function loadByPseudoId(pseudoId: string) {
+    setLoading(true)
+    try {
+      const { data: t } = await supabase
+        .from('trajets').select('*')
+        .eq('pseudo_id', pseudoId)
+        .order('date_trajet', { ascending: false })
+        .limit(100)
+      setTrajets(t || [])
+    } catch(e) { console.error(e) }
+    setLoading(false)
+  }
 
   async function load(userId?: string) {
     setLoading(true)
