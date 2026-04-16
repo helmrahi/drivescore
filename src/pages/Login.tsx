@@ -20,6 +20,14 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false)
   const navigate = useNavigate()
 
+  async function handleOAuth(provider: 'google' | 'facebook') {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: 'https://drivescore-eight.vercel.app/auth/callback' }
+    })
+    if (error) setError('Connexion ' + provider + ' échouée')
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true); setError('')
@@ -136,14 +144,14 @@ export default function Login() {
 
           {/* Social */}
           <div style={{ display: 'flex', gap: 8 }}>
-            {[
-              { label: 'Google', icon: <svg width="14" height="14" viewBox="0 0 16 16"><path d="M15.68 8.18c0-.57-.05-1.11-.14-1.64H8v3.1h4.3a3.67 3.67 0 01-1.59 2.41v2h2.57c1.5-1.38 2.4-3.42 2.4-5.87z" fill="#4285F4"/><path d="M8 16c2.16 0 3.97-.72 5.3-1.94l-2.58-2a4.8 4.8 0 01-7.16-2.52H.95v2.07A8 8 0 008 16z" fill="#34A853"/><path d="M3.56 9.54A4.8 4.8 0 013.31 8c0-.54.1-1.06.25-1.54V4.39H.95A8 8 0 000 8c0 1.29.31 2.51.95 3.61l2.61-2.07z" fill="#FBBC05"/><path d="M8 3.18c1.22 0 2.3.42 3.16 1.24l2.37-2.37A8 8 0 00.95 4.39L3.56 6.46A4.77 4.77 0 018 3.18z" fill="#EA4335"/></svg> },
-              { label: 'Facebook', icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="#1877F2"><path d="M16 8A8 8 0 100 8c0 3.99 2.92 7.3 6.75 7.9v-5.6H4.72V8h2.03V6.24c0-2 1.19-3.1 3.01-3.1.87 0 1.78.15 1.78.15v1.96h-1c-.99 0-1.3.61-1.3 1.24V8h2.2l-.35 2.3h-1.85v5.6A8 8 0 0016 8z"/></svg> },
-            ].map((s, i) => (
-              <button key={i} type="button" style={{ flex: 1, padding: '10px', borderRadius: 10, border: `1px solid ${C.borderStrong}`, background: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.textSecondary, fontWeight: 500, fontFamily: C.fontSans }}>
-                {s.icon} {s.label}
-              </button>
-            ))}
+            <button type="button" onClick={() => handleOAuth('google')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: `1px solid ${C.borderStrong}`, background: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.textSecondary, fontWeight: 500, fontFamily: C.fontSans }}>
+              <svg width="14" height="14" viewBox="0 0 16 16"><path d="M15.68 8.18c0-.57-.05-1.11-.14-1.64H8v3.1h4.3a3.67 3.67 0 01-1.59 2.41v2h2.57c1.5-1.38 2.4-3.42 2.4-5.87z" fill="#4285F4"/><path d="M8 16c2.16 0 3.97-.72 5.3-1.94l-2.58-2a4.8 4.8 0 01-7.16-2.52H.95v2.07A8 8 0 008 16z" fill="#34A853"/><path d="M3.56 9.54A4.8 4.8 0 013.31 8c0-.54.1-1.06.25-1.54V4.39H.95A8 8 0 000 8c0 1.29.31 2.51.95 3.61l2.61-2.07z" fill="#FBBC05"/><path d="M8 3.18c1.22 0 2.3.42 3.16 1.24l2.37-2.37A8 8 0 00.95 4.39L3.56 6.46A4.77 4.77 0 018 3.18z" fill="#EA4335"/></svg>
+              Google
+            </button>
+            <button type="button" onClick={() => handleOAuth('facebook')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: `1px solid ${C.borderStrong}`, background: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.textSecondary, fontWeight: 500, fontFamily: C.fontSans }}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="#1877F2"><path d="M16 8A8 8 0 100 8c0 3.99 2.92 7.3 6.75 7.9v-5.6H4.72V8h2.03V6.24c0-2 1.19-3.1 3.01-3.1.87 0 1.78.15 1.78.15v1.96h-1c-.99 0-1.3.61-1.3 1.24V8h2.2l-.35 2.3h-1.85v5.6A8 8 0 0016 8z"/></svg>
+              Facebook
+            </button>
           </div>
 
           {/* Simulateur CTA */}

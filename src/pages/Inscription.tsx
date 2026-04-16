@@ -1,232 +1,314 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const WAFA = {
-  or: '#F5A623', orDark: '#D4891A', orLight: '#FDF3E0',
-  vert: '#2E7D32', vertLight: '#4CAF50', vertDark: '#1B5E20',
-  noir: '#1A1A1A', gris: '#F5F5F5', grisMid: '#E8E8E8',
+const C = {
+  greenDeep: '#0D2E1C', greenMid: '#1E5C35', greenAccent: '#2A8A50', greenBright: '#3EBD6F',
+  amber: '#F5A623', amberLight: '#FDF0D5', amberDark: '#8B5E00',
+  red: '#E5403A', redLight: '#FDEAEA',
+  blue: '#2D7DD2', blueLight: '#E8F2FC', blueDark: '#1A4A7D',
+  white: '#FFFFFF', surface: '#F7F8F6', surface2: '#EDEFEB',
+  textPrimary: '#0D1F16', textSecondary: '#4A6355', textTertiary: '#8AA898',
+  border: 'rgba(13,46,28,0.08)', borderStrong: 'rgba(13,46,28,0.14)',
+  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace",
 }
 
-const inp = {
-  width:'100%', padding:'14px 14px 14px 44px',
-  borderRadius:12, border:`1.5px solid #E8E8E8`,
-  fontSize:14, outline:'none', boxSizing:'border-box' as const,
-  background:'#F5F5F5', color:'#1A1A1A',
+const inp: React.CSSProperties = {
+  width: '100%', padding: '12px 14px', borderRadius: 12,
+  border: `1px solid ${C.borderStrong}`, fontSize: 14, outline: 'none',
+  background: C.white, color: C.textPrimary, fontFamily: C.fontSans,
+  boxSizing: 'border-box',
 }
-const inpNoIcon = { ...inp, paddingLeft:'14px' }
+
+function pwdStrength(p: string): { score: number; label: string; color: string } {
+  let s = 0
+  if (p.length >= 8) s++
+  if (/[A-Z]/.test(p)) s++
+  if (/[0-9]/.test(p)) s++
+  if (/[^A-Za-z0-9]/.test(p)) s++
+  const levels = [
+    { label: '', color: C.surface2 },
+    { label: 'Faible', color: C.red },
+    { label: 'Moyen', color: C.amber },
+    { label: 'Bon', color: C.greenAccent },
+    { label: 'Excellent', color: C.greenBright },
+  ]
+  return { score: s, ...levels[s] }
+}
 
 export default function Inscription() {
-  const [form, setForm] = useState({ prenom:'', nom:'', email:'', telephone:'', password:'', confirm:'' })
-  const [cgu, setCgu] = useState(false)
-  const [gps, setGps] = useState(false)
+  const navigate = useNavigate()
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState({ prenom: '', nom: '', email: '', password: '', confirm: '' })
+  const [consents, setConsents] = useState({ gps: false, cgu: false, marketing: false })
+  const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
+  const [success, setSuccess] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (form.password !== form.confirm) { setError('Mots de passe différents'); return }
-    if (!cgu || !gps) { setError('Veuillez accepter les consentements CNDP obligatoires'); return }
-    setLoading(true)
-    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password })
-    if (error) { setError(error.message); setLoading(false); return }
+  const pwd = pwdStrength(form.password)
+
+  async function handleOAuth(provider: 'google' | 'facebook') {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: 'https://drivescore-eight.vercel.app/auth/callback' }
+    })
+    if (error) setError('Connexion ' + provider + ' échouée')
+  }
+
+  async function submit() {
+    if (!consents.gps || !consents.cgu) { setError('Veuillez accepter les consentements obligatoires'); return }
+    setLoading(true); setError('')
+    const { data, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password })
+    if (signUpError) { setError(signUpError.message); setLoading(false); return }
     if (data.user) {
+      const pseudoId = 'DS' + Math.random().toString(36).substr(2, 8).toUpperCase()
       await supabase.from('profiles').upsert({
-        id: data.user.id, nom: form.nom, prenom: form.prenom,
-        telephone: form.telephone, role: 'client',
-        consentement_gps: gps, consentement_marketing: false
+        id: data.user.id, pseudo_id: pseudoId,
+        prenom: form.prenom, nom: form.nom, email: form.email,
+        role: 'client', consentement_gps: consents.gps,
+        consentement_marketing: consents.marketing,
+        afficher_leaderboard: false,
       })
-      await supabase.from('consentements').insert([
-        { user_id: data.user.id, type_consentement: 'traitement_donnees', accorde: true, date_accord: new Date().toISOString() },
-        { user_id: data.user.id, type_consentement: 'geolocalisation', accorde: gps, date_accord: new Date().toISOString() }
-      ])
-      navigate('/dashboard')
     }
+    setSuccess(true)
     setLoading(false)
   }
 
-  return (
-    <>
-      <style>{`
-        .insc-left { display: none; }
-        @media (min-width: 768px) { .insc-left { display: flex; } }
-      `}</style>
-      <div style={{minHeight:'100vh',fontFamily:'Inter,sans-serif',display:'flex',background:WAFA.gris}}>
+  if (success) return (
+    <div style={{ minHeight: '100vh', background: C.greenDeep, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: C.fontSans }}>
+      <div style={{ background: C.white, borderRadius: 20, padding: '36px 28px', textAlign: 'center', maxWidth: 340 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+        <div style={{ fontSize: 20, fontWeight: 600, color: C.textPrimary, marginBottom: 8 }}>Compte créé !</div>
+        <div style={{ fontSize: 13, color: C.textTertiary, lineHeight: 1.6, marginBottom: 24 }}>
+          Un email de confirmation a été envoyé à <strong style={{ color: C.textPrimary }}>{form.email}</strong>.<br />
+          Cliquez sur le lien pour activer votre compte.
+        </div>
+        <button onClick={() => navigate('/login')} style={{ width: '100%', padding: '13px', borderRadius: 12, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+          → Se connecter
+        </button>
+      </div>
+    </div>
+  )
 
-        <div className="insc-left" style={{
-          flex:'0 0 46%', flexDirection:'column', justifyContent:'space-between',
-          padding:'52px 56px', position:'relative', overflow:'hidden',
-          background:`linear-gradient(160deg,${WAFA.vertDark} 0%,${WAFA.vert} 60%,${WAFA.vertLight} 100%)`
-        }}>
-          <div style={{position:'absolute',top:-100,right:-100,width:350,height:350,borderRadius:'50%',background:'rgba(245,166,35,0.08)'}} />
-          <div style={{position:'absolute',bottom:-80,left:-80,width:280,height:280,borderRadius:'50%',background:'rgba(0,0,0,0.06)'}} />
-          <div>
-            <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:52}}>
-              <img src="/wafa-logo.png" alt="Wafa" style={{width:60,height:60,borderRadius:12,objectFit:'cover'}} />
-              <div>
-                <div style={{color:'white',fontWeight:900,fontSize:24,letterSpacing:'-0.5px',lineHeight:1}}>WAFA<span style={{color:WAFA.or}}> ASSURANCE</span></div>
-                <div style={{display:'inline-block',marginTop:6,background:WAFA.or,color:WAFA.noir,fontSize:10,fontWeight:800,letterSpacing:'1.5px',padding:'3px 10px',borderRadius:20}}>DRIVESCORE PAYD</div>
-              </div>
-            </div>
-            <h2 style={{color:'white',fontSize:28,fontWeight:900,marginBottom:24,letterSpacing:'-0.5px'}}>
-              Rejoignez DriveScore<br/><span style={{color:WAFA.or}}>en 3 étapes</span>
-            </h2>
-            {[
-              {num:'01',title:'Vos informations',desc:'Prénom, nom, email et téléphone'},
-              {num:'02',title:'Sécurité',desc:'Créez votre mot de passe'},
-              {num:'03',title:'Consentements',desc:'Conformité CNDP (Loi 09-08)'},
-            ].map((s,i) => (
-              <div key={i} style={{display:'flex',alignItems:'center',gap:14,padding:'14px 18px',borderRadius:14,marginBottom:8,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)'}}>
-                <div style={{width:36,height:36,borderRadius:10,flexShrink:0,background:'rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13,color:'rgba(255,255,255,0.4)'}}>
-                  {s.num}
-                </div>
-                <div>
-                  <div style={{color:'rgba(255,255,255,0.5)',fontWeight:700,fontSize:14}}>{s.title}</div>
-                  <div style={{color:'rgba(255,255,255,0.35)',fontSize:12,marginTop:1}}>{s.desc}</div>
-                </div>
-              </div>
-            ))}
+  const progress = Math.round((step / 3) * 100)
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.greenDeep, fontFamily: C.fontSans }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pdot{0%,100%{opacity:.6}50%{opacity:1}}`}</style>
+
+      {/* HEADER */}
+      <div style={{ padding: '18px 22px 20px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, background: 'radial-gradient(circle,rgba(62,189,111,0.18) 0%,transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.greenBright, animation: 'pdot 2.5s ease-in-out infinite' }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.65)' }}>DriveScore · Inscription</span>
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:8,paddingTop:32}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:WAFA.or}} />
-            <span style={{color:'rgba(255,255,255,0.4)',fontSize:11}}>Wafa Assurance · Leader depuis 1972</span>
-          </div>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Étape {step}/3</span>
         </div>
 
-        <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'32px 20px',background:'white',overflowY:'auto'}}>
-          <div style={{width:'100%',maxWidth:420}}>
+        {/* Progress */}
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.1)', borderRadius: 2, marginBottom: 16, position: 'relative', zIndex: 1 }}>
+          <div style={{ width: `${progress}%`, height: '100%', background: C.greenBright, borderRadius: 2, transition: 'width 0.3s ease' }} />
+        </div>
 
-            <div style={{textAlign:'center',marginBottom:24}}>
-              <img src="/wafa-logo.png" alt="Wafa" style={{width:48,height:48,borderRadius:10,objectFit:'cover',marginBottom:10}} />
-              <div style={{fontWeight:900,fontSize:15,color:WAFA.noir}}>WAFA <span style={{color:WAFA.vert}}>ASSURANCE</span></div>
-              <h2 style={{fontSize:24,fontWeight:900,color:WAFA.noir,margin:'12px 0 4px',letterSpacing:'-0.5px'}}>Inscription</h2>
-              <p style={{color:'#64748B',fontSize:14,margin:0}}>Remplissez les informations ci-dessous</p>
-            </div>
-
-            <div style={{background:'white',borderRadius:20,padding:'28px 24px',boxShadow:'0 4px 24px rgba(0,0,0,0.08)',border:`1px solid ${WAFA.grisMid}`}}>
-              {error && (
-                <div style={{background:'#FEF2F2',border:'1px solid #FECACA',color:'#DC2626',padding:'12px 16px',borderRadius:12,marginBottom:20,fontSize:13,fontWeight:500}}>
-                  ⚠️ {error}
+        {/* Steps */}
+        <div style={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          {[['1','Identité'],['2','Sécurité'],['3','Consentement']].map(([n, label], i) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: step > i + 1 ? C.greenBright : step === i + 1 ? C.greenBright : 'rgba(255,255,255,0.1)', color: step >= i + 1 ? C.greenDeep : 'rgba(255,255,255,0.35)', transition: 'all 0.2s' }}>
+                  {step > i + 1 ? '✓' : n}
                 </div>
-              )}
-              <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:18}}>
-
-                <div style={{background:WAFA.gris,borderRadius:14,padding:'18px 16px'}}>
-                  <div style={{fontSize:11,fontWeight:800,color:WAFA.vert,letterSpacing:'1px',marginBottom:14}}>01 · VOS INFORMATIONS</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-                    <div>
-                      <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>PRÉNOM</label>
-                      <div style={{position:'relative'}}>
-                        <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>👤</span>
-                        <input required placeholder="Sara" value={form.prenom}
-                          onChange={e => setForm(f=>({...f,prenom:e.target.value}))} style={inp}
-                          onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                          onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>NOM</label>
-                      <input required placeholder="Alami" value={form.nom}
-                        onChange={e => setForm(f=>({...f,nom:e.target.value}))} style={inpNoIcon}
-                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                        onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                    </div>
-                  </div>
-                  <div style={{marginBottom:12}}>
-                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>EMAIL</label>
-                    <div style={{position:'relative'}}>
-                      <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>✉️</span>
-                      <input type="email" required placeholder="sara.alami@email.com" value={form.email}
-                        onChange={e => setForm(f=>({...f,email:e.target.value}))} style={inp}
-                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                        onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>TÉLÉPHONE</label>
-                    <div style={{position:'relative'}}>
-                      <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>📱</span>
-                      <input type="tel" placeholder="+212 6xx xxx xxx" value={form.telephone}
-                        onChange={e => setForm(f=>({...f,telephone:e.target.value}))} style={inp}
-                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                        onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{background:WAFA.gris,borderRadius:14,padding:'18px 16px'}}>
-                  <div style={{fontSize:11,fontWeight:800,color:WAFA.vert,letterSpacing:'1px',marginBottom:14}}>02 · SÉCURITÉ</div>
-                  <div style={{marginBottom:12}}>
-                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>MOT DE PASSE</label>
-                    <div style={{position:'relative'}}>
-                      <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔒</span>
-                      <input type="password" required placeholder="Minimum 6 caractères" value={form.password}
-                        onChange={e => setForm(f=>({...f,password:e.target.value}))} style={inp}
-                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                        onBlur={e=>{e.target.style.borderColor=WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{display:'block',fontSize:12,fontWeight:700,color:'#6B7280',marginBottom:6}}>CONFIRMER</label>
-                    <div style={{position:'relative'}}>
-                      <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14}}>🔒</span>
-                      <input type="password" required placeholder="••••••••" value={form.confirm}
-                        onChange={e => setForm(f=>({...f,confirm:e.target.value}))}
-                        style={{...inp, borderColor: form.confirm && form.confirm!==form.password ? '#EF4444' : WAFA.grisMid}}
-                        onFocus={e=>{e.target.style.borderColor=WAFA.vert;e.target.style.background='white'}}
-                        onBlur={e=>{e.target.style.borderColor=form.confirm!==form.password?'#EF4444':WAFA.grisMid;e.target.style.background=WAFA.gris}} />
-                    </div>
-                    {form.confirm && form.confirm!==form.password && (
-                      <p style={{fontSize:11,color:'#EF4444',margin:'4px 0 0'}}>⚠️ Les mots de passe ne correspondent pas</p>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{background:WAFA.orLight,border:`1.5px solid ${WAFA.or}40`,borderRadius:14,padding:'18px 16px'}}>
-                  <div style={{fontSize:11,fontWeight:800,color:WAFA.orDark,letterSpacing:'1px',marginBottom:4}}>03 · CONSENTEMENTS CNDP</div>
-                  <p style={{fontSize:11,color:'#92400E',margin:'0 0 14px',lineHeight:1.5}}>Conformément à la Loi 09-08 relative à la protection des données personnelles au Maroc</p>
-                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                    <label style={{display:'flex',alignItems:'flex-start',gap:12,cursor:'pointer',padding:'12px 14px',background:'white',borderRadius:10,border:`1px solid ${cgu?WAFA.vert:WAFA.grisMid}`}}>
-                      <input type="checkbox" checked={cgu} onChange={e=>setCgu(e.target.checked)} style={{marginTop:2,accentColor:WAFA.vert,width:16,height:16,flexShrink:0}} />
-                      <div>
-                        <div style={{fontSize:13,fontWeight:600,color:WAFA.noir,marginBottom:2}}>✅ Conditions générales et traitement des données</div>
-                        <div style={{fontSize:11,color:'#64748B',lineHeight:1.5}}>J'accepte que Wafa Assurance collecte et traite mes données personnelles</div>
-                      </div>
-                    </label>
-                    <label style={{display:'flex',alignItems:'flex-start',gap:12,cursor:'pointer',padding:'12px 14px',background:'white',borderRadius:10,border:`1px solid ${gps?WAFA.vert:WAFA.grisMid}`}}>
-                      <input type="checkbox" checked={gps} onChange={e=>setGps(e.target.checked)} style={{marginTop:2,accentColor:WAFA.vert,width:16,height:16,flexShrink:0}} />
-                      <div>
-                        <div style={{fontSize:13,fontWeight:600,color:WAFA.noir,marginBottom:2}}>📍 Données de conduite et géolocalisation</div>
-                        <div style={{fontSize:11,color:'#64748B',lineHeight:1.5}}>J'autorise la collecte de mes données de conduite pour le calcul de ma prime PAYD</div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading} style={{
-                  padding:'16px',borderRadius:14,
-                  background:loading?'#94A3B8':`linear-gradient(135deg,${WAFA.vertDark},${WAFA.vert})`,
-                  color:'white',border:'none',fontWeight:800,fontSize:15,
-                  cursor:loading?'not-allowed':'pointer',
-                  boxShadow:loading?'none':`0 6px 20px rgba(46,125,50,0.4)`
-                }}>
-                  {loading ? '⏳ Création du compte...' : '🚀 Créer mon compte DriveScore'}
-                </button>
-              </form>
-
-              <div style={{marginTop:16,textAlign:'center',fontSize:13,color:'#64748B'}}>
-                Déjà un compte ?{' '}
-                <Link to="/login" style={{color:WAFA.vert,fontWeight:700,textDecoration:'none'}}>Se connecter →</Link>
+                <span style={{ fontSize: 10, color: step >= i + 1 ? 'white' : 'rgba(255,255,255,0.35)', fontWeight: step === i + 1 ? 600 : 400 }}>{label}</span>
               </div>
+              {i < 2 && <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />}
             </div>
-
-            <p style={{fontSize:11,color:'#94A3B8',margin:'16px 0 0',textAlign:'center',lineHeight:1.6}}>
-              Hébergement Europe · Conforme CNDP · © 2026 Wafa Assurance
-            </p>
-          </div>
+          ))}
         </div>
       </div>
-    </>
+
+      {/* CARD */}
+      <div style={{ background: C.surface, borderRadius: '22px 22px 0 0', padding: '22px 22px 40px', minHeight: '65vh' }}>
+
+        {error && (
+          <div style={{ background: C.redLight, border: `1px solid rgba(229,64,58,0.2)`, color: '#8B1A17', padding: '10px 14px', borderRadius: 10, marginBottom: 14, fontSize: 13 }}>
+            ⚠ {error}
+          </div>
+        )}
+
+        {/* ÉTAPE 1 */}
+        {step === 1 && (
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: C.textPrimary, marginBottom: 4 }}>Vos informations</div>
+              <div style={{ fontSize: 12, color: C.textTertiary }}>Renseignez vos coordonnées personnelles</div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* OAuth rapide */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                <button type="button" onClick={() => handleOAuth('google')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: `1px solid ${C.borderStrong}`, background: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.textSecondary, fontWeight: 500, fontFamily: C.fontSans }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16"><path d="M15.68 8.18c0-.57-.05-1.11-.14-1.64H8v3.1h4.3a3.67 3.67 0 01-1.59 2.41v2h2.57c1.5-1.38 2.4-3.42 2.4-5.87z" fill="#4285F4"/><path d="M8 16c2.16 0 3.97-.72 5.3-1.94l-2.58-2a4.8 4.8 0 01-7.16-2.52H.95v2.07A8 8 0 008 16z" fill="#34A853"/><path d="M3.56 9.54A4.8 4.8 0 013.31 8c0-.54.1-1.06.25-1.54V4.39H.95A8 8 0 000 8c0 1.29.31 2.51.95 3.61l2.61-2.07z" fill="#FBBC05"/><path d="M8 3.18c1.22 0 2.3.42 3.16 1.24l2.37-2.37A8 8 0 00.95 4.39L3.56 6.46A4.77 4.77 0 018 3.18z" fill="#EA4335"/></svg>
+                  Google
+                </button>
+                <button type="button" onClick={() => handleOAuth('facebook')} style={{ flex: 1, padding: '10px', borderRadius: 10, border: `1px solid ${C.borderStrong}`, background: C.white, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: C.textSecondary, fontWeight: 500, fontFamily: C.fontSans }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#1877F2"><path d="M16 8A8 8 0 100 8c0 3.99 2.92 7.3 6.75 7.9v-5.6H4.72V8h2.03V6.24c0-2 1.19-3.1 3.01-3.1.87 0 1.78.15 1.78.15v1.96h-1c-.99 0-1.3.61-1.3 1.24V8h2.2l-.35 2.3h-1.85v5.6A8 8 0 0016 8z"/></svg>
+                  Facebook
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, height: 0.5, background: C.border }} />
+                <span style={{ fontSize: 10, color: C.textTertiary }}>ou avec email</span>
+                <div style={{ flex: 1, height: 0.5, background: C.border }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {[['prenom','PRÉNOM','Sara'],['nom','NOM','Alami']].map(([key,label,ph]) => (
+                  <div key={key}>
+                    <div style={{ fontSize: 10, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.4px', marginBottom: 6 }}>{label}</div>
+                    <input style={inp} placeholder={ph} value={(form as any)[key]} onChange={e => setForm(f => ({...f, [key]: e.target.value}))} />
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.4px', marginBottom: 6 }}>EMAIL</div>
+                <input style={inp} type="email" placeholder="sara.alami@email.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} />
+              </div>
+
+              {/* Avantages */}
+              <div style={{ background: 'rgba(42,138,80,0.06)', borderRadius: 12, padding: 12, border: '1px solid rgba(42,138,80,0.12)' }}>
+                <div style={{ fontSize: 10, color: C.greenAccent, fontWeight: 600, letterSpacing: '0.4px', marginBottom: 8 }}>CE QUE VOUS OBTENEZ</div>
+                {[
+                  { text: "Score de conduite en temps réel", color: C.greenBright },
+                  { text: "Réduction jusqu'à -15% sur votre prime", color: C.greenBright },
+                  { text: "Carte GPS de chaque trajet", color: C.amber },
+                ].map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < 2 ? 6 : 0 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(62,189,111,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 9, color: b.color }}>✓</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: C.textSecondary }}>{b.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => { if (!form.prenom || !form.email) { setError('Renseignez prénom et email'); return } setError(''); setStep(2) }} style={{ width: '100%', padding: '14px', borderRadius: 14, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+                Continuer →
+              </button>
+
+              <div style={{ textAlign: 'center', fontSize: 12, color: C.textTertiary }}>
+                Déjà inscrit ? <span onClick={() => navigate('/login')} style={{ color: C.greenAccent, fontWeight: 500, cursor: 'pointer' }}>Se connecter</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ÉTAPE 2 */}
+        {step === 2 && (
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: C.textPrimary, marginBottom: 4 }}>Sécurisez votre compte</div>
+              <div style={{ fontSize: 12, color: C.textTertiary }}>Choisissez un mot de passe fort</div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.4px', marginBottom: 6 }}>MOT DE PASSE</div>
+                <div style={{ position: 'relative' }}>
+                  <input style={{ ...inp, paddingRight: 42 }} type={showPwd ? 'text' : 'password'} placeholder="Min. 8 caractères" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} />
+                  <button type="button" onClick={() => setShowPwd(!showPwd)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: C.textTertiary }}>
+                    {showPwd ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.4px', marginBottom: 6 }}>CONFIRMER</div>
+                <input style={inp} type="password" placeholder="Répétez le mot de passe" value={form.confirm} onChange={e => setForm(f => ({...f, confirm: e.target.value}))} />
+              </div>
+
+              {/* Force password */}
+              {form.password.length > 0 && (
+                <div style={{ background: C.surface, borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 6 }}>FORCE DU MOT DE PASSE</div>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                    {[1,2,3,4].map(i => (
+                      <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= pwd.score ? pwd.color : C.surface2, transition: 'background 0.2s' }} />
+                    ))}
+                  </div>
+                  {pwd.label && <div style={{ fontSize: 10, color: pwd.color }}>{pwd.label}</div>}
+                </div>
+              )}
+
+              <button onClick={() => {
+                if (form.password.length < 8) { setError('Mot de passe trop court'); return }
+                if (form.password !== form.confirm) { setError('Les mots de passe ne correspondent pas'); return }
+                setError(''); setStep(3)
+              }} style={{ width: '100%', padding: '14px', borderRadius: 14, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer', fontFamily: C.fontSans }}>
+                Continuer →
+              </button>
+              <button onClick={() => setStep(1)} style={{ width: '100%', padding: '10px', borderRadius: 12, background: 'transparent', border: `1px solid ${C.borderStrong}`, color: C.textTertiary, fontSize: 13, cursor: 'pointer', fontFamily: C.fontSans }}>← Retour</button>
+            </div>
+          </div>
+        )}
+
+        {/* ÉTAPE 3 */}
+        {step === 3 && (
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: C.textPrimary, marginBottom: 4 }}>Consentements CNDP</div>
+              <div style={{ fontSize: 12, color: C.textTertiary }}>Conformité Loi 09-08 Maroc</div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { key: 'gps', title: 'Collecte de données GPS *', desc: 'Pendant vos trajets uniquement. Données hébergées en Europe.', required: true },
+                { key: 'cgu', title: 'CGU Wafa Assurance *', desc: "J'accepte les conditions générales d'utilisation DriveScore.", required: true },
+                { key: 'marketing', title: 'Communications marketing', desc: 'Offres et conseils Wafa Assurance (facultatif).', required: false },
+              ].map(item => (
+                <div key={item.key} onClick={() => setConsents(c => ({...c, [item.key]: !(c as any)[item.key]}))}
+                  style={{ background: C.white, borderRadius: 12, padding: 12, border: `1px solid ${(consents as any)[item.key] ? C.greenAccent + '40' : C.border}`, display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', transition: 'border-color 0.15s' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: 6, background: (consents as any)[item.key] ? C.greenMid : C.surface2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'background 0.15s' }}>
+                    {(consents as any)[item.key] && <span style={{ color: 'white', fontSize: 11 }}>✓</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, marginBottom: 3 }}>{item.title}</div>
+                    <div style={{ fontSize: 11, color: C.textTertiary, lineHeight: 1.5 }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ background: C.blueLight, borderRadius: 10, padding: '10px 12px', border: `1px solid rgba(45,125,210,0.12)`, display: 'flex', gap: 8 }}>
+                <span style={{ fontSize: 14, flexShrink: 0 }}>🔐</span>
+                <div style={{ fontSize: 11, color: C.blueDark, lineHeight: 1.5 }}>Vos données ne sont jamais vendues à des tiers. Suppression possible à tout moment.</div>
+              </div>
+
+              <button onClick={submit} disabled={loading || !consents.gps || !consents.cgu} style={{
+                width: '100%', padding: '14px', borderRadius: 14, fontFamily: C.fontSans,
+                background: loading || !consents.gps || !consents.cgu ? C.surface2 : C.greenMid,
+                color: loading || !consents.gps || !consents.cgu ? C.textTertiary : 'white',
+                border: 'none', fontWeight: 600, fontSize: 14,
+                cursor: loading || !consents.gps || !consents.cgu ? 'not-allowed' : 'pointer',
+              }}>
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    Création en cours...
+                  </span>
+                ) : '🚀 Créer mon compte'}
+              </button>
+
+              <button onClick={() => setStep(2)} style={{ width: '100%', padding: '10px', borderRadius: 12, background: 'transparent', border: `1px solid ${C.borderStrong}`, color: C.textTertiary, fontSize: 13, cursor: 'pointer', fontFamily: C.fontSans }}>← Retour</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
