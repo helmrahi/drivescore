@@ -1,3 +1,4 @@
+import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTelematics } from '../hooks/useTelematics'
 import { useAuth } from '../hooks/useAuth'
@@ -45,12 +46,9 @@ export default function Telematics() {
     startTrajet, stopTrajet, resetTrajet, gpsPoints,
   } = useTelematics()
 
-  async function saveTrajet() {
+  async function saveTrajetReal() {
     if (!profile?.pseudo_id) { if(setError) setError('Session expirée'); return }
-    if (km < 0.5) {
-      const ok = window.confirm(`Trajet court (${km.toFixed(2)} km). Sauvegarder ?`)
-      if (!ok) { resetTrajet(); return }
-    }
+
     setPhase('saving')
     const pts = gpsPoints.current.filter((_,i)=>i%5===0).slice(0,150).map(p=>({
       lat: parseFloat(p.lat.toFixed(5)), lng: parseFloat(p.lng.toFixed(5)),
@@ -77,6 +75,7 @@ export default function Telematics() {
     setTimeout(()=>navigate('/dashboard'), 2000)
   }
 
+  const [confirmShort, setConfirmShort] = React.useState(false)
   const freinages = events.filter(e=>e.type==='freinage').length
   const accels = events.filter(e=>e.type==='acceleration').length
 
@@ -302,7 +301,7 @@ Score: ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD
 
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={()=>navigate('/trajets')} style={{ flex:1, padding:'13px', borderRadius:12, border:`1px solid ${C.borderStrong}`, background:C.white, color:C.textSecondary, fontWeight:500, fontSize:13, cursor:'pointer', fontFamily:C.fontSans }}>Mes trajets</button>
-            <button onClick={saveTrajet} style={{ flex:2, padding:'13px', borderRadius:12, background:C.greenMid, color:'white', border:'none', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:C.fontSans }}>💾 Sauvegarder</button>
+            <button onClick={()=>{ if(km<0.5){setConfirmShort(true)}else{saveTrajetReal()} }} style={{ flex:2, padding:'13px', borderRadius:12, background:C.greenMid, color:'white', border:'none', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:C.fontSans }}>💾 Sauvegarder</button>
           </div>
         </div>
       )}
@@ -324,6 +323,29 @@ Score: ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD
             <div style={{ fontSize:48, marginBottom:12 }}>✅</div>
             <div style={{ fontSize:16, fontWeight:600, color:'white' }}>Trajet sauvegardé !</div>
             <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:6 }}>Redirection...</div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TRAJET COURT */}
+      {confirmShort && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(13,46,28,0.7)', zIndex:200, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+          <div style={{ background:C.white, borderRadius:'22px 22px 0 0', padding:'28px 24px 40px', width:'100%', maxWidth:480, animation:'fadeUp 0.25s ease' }}>
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>📍</div>
+              <div style={{ fontSize:17, fontWeight:600, color:C.textPrimary, marginBottom:6 }}>Trajet très court</div>
+              <div style={{ fontSize:13, color:C.textTertiary, lineHeight:1.6 }}>
+                Ce trajet fait seulement <strong style={{ color:C.textPrimary }}>{km.toFixed(2)} km</strong>.<br />Voulez-vous quand même le sauvegarder ?
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={()=>{ setConfirmShort(false); resetTrajet() }} style={{ flex:1, padding:'13px', borderRadius:12, border:`1px solid ${C.borderStrong}`, background:C.white, color:C.textSecondary, fontWeight:500, fontSize:14, cursor:'pointer', fontFamily:C.fontSans }}>
+                Annuler
+              </button>
+              <button onClick={async ()=>{ setConfirmShort(false); await saveTrajetReal() }} style={{ flex:2, padding:'13px', borderRadius:12, background:C.greenMid, color:'white', border:'none', fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:C.fontSans }}>
+                Sauvegarder quand même
+              </button>
+            </div>
           </div>
         </div>
       )}
