@@ -41,12 +41,23 @@ export default function Trajets() {
 
   async function load() {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setLoading(false); return }
-    const { data: p } = await supabase.from('profiles').select('pseudo_id').eq('id', session.user.id).single()
-    if (p?.pseudo_id) {
-      const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', p.pseudo_id).order('created_at', { ascending: false }).limit(50)
-      setTrajets(data || [])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) { setLoading(false); return }
+      // Chercher pseudo_id dans profiles
+      const { data: p } = await supabase
+        .from('profiles').select('pseudo_id')
+        .eq('id', session.user.id).single()
+      if (!p?.pseudo_id) { setLoading(false); return }
+      // Charger tous les trajets
+      const { data: t } = await supabase
+        .from('trajets').select('*')
+        .eq('pseudo_id', p.pseudo_id)
+        .order('date_trajet', { ascending: false })
+        .limit(100)
+      setTrajets(t || [])
+    } catch(e) {
+      console.error('load error:', e)
     }
     setLoading(false)
   }
