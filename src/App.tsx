@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Trajets from './pages/Trajets'
 import Telematics from './pages/Telematics'
 import AuthCallback from './pages/AuthCallback'
+import Admin from './pages/Admin'
 import ResetPassword from './pages/ResetPassword'
 import Simulateur from './pages/Simulateur'
 import CommentCaMarche from './pages/CommentCaMarche'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/trajets" element={<ProtectedRoute><Trajets /></ProtectedRoute>} />
         <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/simulateur" element={<Simulateur />} />
