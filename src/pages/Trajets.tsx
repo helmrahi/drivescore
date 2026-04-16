@@ -40,15 +40,15 @@ export default function Trajets() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    setDataLoading(true)
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setDataLoading(false); return }
+    if (!session?.user) { setLoading(false); return }
     const { data: p } = await supabase.from('profiles').select('pseudo_id').eq('id', session.user.id).single()
     if (p?.pseudo_id) {
       const { data } = await supabase.from('trajets').select('*').eq('pseudo_id', p.pseudo_id).order('created_at', { ascending: false }).limit(50)
       setTrajets(data || [])
     }
-    setDataLoading(false)
+    setLoading(false)
   }
 
   async function submit(e: React.FormEvent) {
