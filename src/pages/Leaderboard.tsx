@@ -31,13 +31,14 @@ export default function Leaderboard() {
   const [periode, setPeriode] = useState<'mois' | 'tout'>('mois')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [periode])
+  useEffect(() => { load() }, [periode]) // eslint-disable-line
 
   async function load() {
     setLoading(true)
     try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setLoading(false); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) { setLoading(false); return }
+    const user = session.user
     const { data: myProfile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
     if (myProfile) setMyPseudoId(myProfile.pseudo_id)
     const [trajets, profiles] = await Promise.all([getAllTrajets(), getAllProfiles()])
