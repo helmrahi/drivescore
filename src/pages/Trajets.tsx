@@ -120,7 +120,6 @@ export default function Trajets() {
   return (
     <div style={{ minHeight: '100vh', background: C.surface, fontFamily: C.fontSans, paddingBottom: 80 }}>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{background:'red',color:'white',padding:'4px 8px',fontSize:10,position:'fixed',top:0,left:0,zIndex:999,right:0}}>P:{profile?.pseudo_id||'NULL'} T:{trajets.length} KM:{totalKm}</div>
 
       {/* HEADER */}
       <div style={{ background: C.greenDeep, position: 'relative', overflow: 'hidden' }}>
