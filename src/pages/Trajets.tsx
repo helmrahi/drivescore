@@ -113,9 +113,9 @@ export default function Trajets() {
   })
 
   console.log('TRAJETS STATE:', trajets.length, trajets[0])
-  const totalKm = parseFloat(trajets.reduce((s:number,t:any) => s+parseFloat(t.km||0), 0).toFixed(1))
-  const avgScore = trajets.length > 0 ? Math.round(trajets.reduce((s:number,t:any) => s+(parseInt(t.score_trajet)||0),0)/trajets.length) : 0
-  const totalCout = parseFloat(trajets.reduce((s:number,t:any) => s+parseFloat(t.cout_mad||0),0).toFixed(2))
+  const totalKm = parseFloat(trajets.reduce((s:number,t:any) => s + (isNaN(parseFloat(t.km)) ? 0 : parseFloat(t.km)), 0).toFixed(1))
+  const avgScore = trajets.length > 0 ? Math.round(trajets.reduce((s:number,t:any) => s + (isNaN(Number(t.score_trajet)) ? 0 : Number(t.score_trajet)), 0) / trajets.length) : 0
+  const totalCout = parseFloat(trajets.reduce((s:number,t:any) => s + (isNaN(parseFloat(t.cout_mad)) ? 0 : parseFloat(t.cout_mad)), 0).toFixed(2))
 
   return (
     <div style={{ minHeight: '100vh', background: C.surface, fontFamily: C.fontSans, paddingBottom: 80 }}>
