@@ -13,6 +13,7 @@ export function useAuth() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const justSignedIn = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -43,10 +44,13 @@ export function useAuth() {
     // Écouter les changements de session — refresh automatique
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        if (justSignedIn.current) return // ignore déconnexion immédiate après OAuth
         navigate('/login')
         return
       }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        justSignedIn.current = true
+        setTimeout(() => { justSignedIn.current = false }, 3000)
         if (session?.user) {
           setUser(session.user)
           let p = await getProfile(session.user.id)
