@@ -19,7 +19,22 @@ export function useAuth() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) { navigate('/login'); return }
       setUser(session.user)
-      const p = await getProfile(session.user.id)
+      let p = await getProfile(session.user.id)
+      // Créer profil si OAuth sans profil
+      if (!p) {
+        const { supabase: sb } = await import('../lib/supabase')
+        const pseudoId = 'DS' + Math.random().toString(36).substr(2, 8).toUpperCase()
+        const meta = session.user.user_metadata || {}
+        const prenom = meta.full_name?.split(' ')[0] || meta.name?.split(' ')[0] || 'Conducteur'
+        const nom = meta.full_name?.split(' ').slice(1).join(' ') || ''
+        await sb.from('profiles').insert({
+          id: session.user.id, pseudo_id: pseudoId,
+          prenom, nom, email: session.user.email,
+          role: 'client', consentement_gps: false,
+          consentement_marketing: false, afficher_leaderboard: false,
+        })
+        p = await getProfile(session.user.id)
+      }
       setProfile(p)
       setLoading(false)
     }
@@ -34,7 +49,19 @@ export function useAuth() {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user)
-          const p = await getProfile(session.user.id)
+          let p = await getProfile(session.user.id)
+          if (!p) {
+            const pseudoId = 'DS' + Math.random().toString(36).substr(2, 8).toUpperCase()
+            const meta = session.user.user_metadata || {}
+            const prenom = meta.full_name?.split(' ')[0] || 'Conducteur'
+            await supabase.from('profiles').insert({
+              id: session.user.id, pseudo_id: pseudoId,
+              prenom, nom: '', email: session.user.email,
+              role: 'client', consentement_gps: false,
+              consentement_marketing: false, afficher_leaderboard: false,
+            })
+            p = await getProfile(session.user.id)
+          }
           setProfile(p)
           setLoading(false)
         }
