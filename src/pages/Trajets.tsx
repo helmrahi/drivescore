@@ -95,6 +95,7 @@ export default function Trajets() {
     return true
   })
 
+  console.log('TRAJETS STATE:', trajets.length, trajets[0])
   const totalKm = parseFloat(trajets.reduce((s:number,t:any) => s+parseFloat(t.km||0), 0).toFixed(1))
   const avgScore = trajets.length > 0 ? Math.round(trajets.reduce((s:number,t:any) => s+(parseInt(t.score_trajet)||0),0)/trajets.length) : 0
   const totalCout = parseFloat(trajets.reduce((s:number,t:any) => s+parseFloat(t.cout_mad||0),0).toFixed(2))
