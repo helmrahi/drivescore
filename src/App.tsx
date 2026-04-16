@@ -35,7 +35,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
-  return user ? <>{children}</> : <Navigate to="/login" replace />
+  // Délai anti-flash pour OAuth
+  if (!user && !loading) return <Navigate to="/login" replace />
+  if (!user) return null
+  return <>{children}</>
 }
 
 export default function App() {
