@@ -46,7 +46,7 @@ export default function TrajetMapStrava({ points, speedMax = 0, incidents = [], 
       })
 
       // Tuiles sombres style Strava
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
       }).addTo(map)
 
@@ -116,7 +116,7 @@ export default function TrajetMapStrava({ points, speedMax = 0, incidents = [], 
         {/* Légende vitesse */}
         <div style={{
           position: 'absolute', bottom: 8, right: 8,
-          background: 'rgba(0,0,0,0.75)', borderRadius: 8,
+          background: 'rgba(255,255,255,0.85)', borderRadius: 8,
           padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 3,
         }}>
           {[
@@ -126,7 +126,7 @@ export default function TrajetMapStrava({ points, speedMax = 0, incidents = [], 
           ].map((l, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 24, height: 3, background: l.color, borderRadius: 2 }} />
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>{l.label}</span>
+              <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.7)' }}>{l.label}</span>
             </div>
           ))}
         </div>
@@ -135,7 +135,7 @@ export default function TrajetMapStrava({ points, speedMax = 0, incidents = [], 
         <div style={{
           position: 'absolute', top: 8, left: 8,
           background: 'rgba(0,0,0,0.6)', borderRadius: 6,
-          padding: '3px 8px', fontSize: 10, color: 'rgba(255,255,255,0.8)',
+          padding: '3px 8px', fontSize: 10, color: 'rgba(0,0,0,0.7)',
         }}>
           📍 {points.length} points GPS
         </div>

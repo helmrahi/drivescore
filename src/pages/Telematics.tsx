@@ -44,7 +44,7 @@ export default function Telematics() {
   const scoreOffset = circumference - (circumference * score / 100)
 
   async function saveTrajet() {
-    if (!profile?.pseudo_id) { navigate('/login'); return }
+    if (!profile?.pseudo_id) { if (setError) setError('Session expirée. Reconnectez-vous.'); return }
     if (!Number.isFinite(km) || km <= 0) {
       if (setError) setError('Distance invalide, impossible de sauvegarder le trajet.')
       setTimeout(() => { if (setError) setError('') }, 4000)
@@ -52,7 +52,7 @@ export default function Telematics() {
       return
     }
     if (km < 0.5) {
-      const ok = window.confirm(`Trajet très court (${km.toFixed(2)} km). Sauvegarder quand même ?`)
+      const ok = window.confirm(`Trajet très court (${km.toFixed(2)} km). Sauvegarder ?`)
       if (!ok) { resetTrajet(); return }
     }
     setPhase('saving')

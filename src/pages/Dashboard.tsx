@@ -245,7 +245,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 32, marginBottom: 8 }}>🛣️</div>
               Aucun trajet sur cette période
             </div>
-          ) : trajetsFiltres.slice(0, 4).map((t, i) => {
+          ) : trajetsFiltres.slice(0, 3).map((t, i) => {
             const isOpen = expanded === (t.id || String(i))
             const sc = t.score_trajet || 0
             const scColor = getScoreColor(sc)
