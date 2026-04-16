@@ -31,16 +31,17 @@ export default function Leaderboard() {
   const [periode, setPeriode] = useState<'mois' | 'tout'>('mois')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [periode]) // eslint-disable-line
-
-  async function load() {
+  useEffect(() => { 
+    let mounted = true
+    async function load() {
+    if (!mounted) return
     setLoading(true)
     try {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) { setLoading(false); return }
+    if (!session?.user || !mounted) { setLoading(false); return }
     const user = session.user
     const { data: myProfile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
-    if (myProfile) setMyPseudoId(myProfile.pseudo_id)
+    if (myProfile && mounted) setMyPseudoId(myProfile.pseudo_id)
     const [trajets, profiles] = await Promise.all([getAllTrajets(), getAllProfiles()])
     const profileMap = new Map(profiles.map((p: any) => [p.pseudo_id, p]))
     const now = new Date()
@@ -74,8 +75,11 @@ export default function Leaderboard() {
     })).filter(d => d.trajets > 0)
 
     setDrivers(list)
-    } catch(e) { console.error(e) } finally { setLoading(false) }
-  }
+    } catch(e) { console.error(e) } finally { if(mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
+  }, [periode])
 
   const sorted = [...drivers].sort((a, b) => {
     if (filter === 'score') return b.score - a.score

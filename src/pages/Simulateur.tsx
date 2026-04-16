@@ -120,9 +120,8 @@ export default function Simulateur() {
             <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px' }}>KILOMÉTRAGE MENSUEL</div>
             <div style={{ fontSize: 22, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>{km}<span style={{ fontSize: 12, color: C.textTertiary, fontFamily: C.fontSans, marginLeft: 4 }}>km/mois</span></div>
           </div>
-          <input type="range" min="100" max="3000" step="50" value={km}
+          <input type="range" min="100" max="3000" step="50" defaultValue={km}
             onInput={e => setKm(parseInt((e.target as HTMLInputElement).value))}
-            onChange={e => { const v = parseInt(e.target.value); setKm(v); }}
             style={{ width: '100%', accentColor: C.greenAccent, cursor: 'pointer' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textTertiary, marginTop: 4 }}>
             <span>100 km</span><span>3 000 km</span>
@@ -176,9 +175,8 @@ export default function Simulateur() {
               <span style={{ fontSize: 13, color: C.textPrimary, fontWeight: 500 }}>🪪 Ancienneté du permis de conduire</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: anciennete >= 5 ? C.greenAccent : C.amber, fontFamily: C.fontMono }}>{anciennete} ans</span>
             </div>
-            <input type="range" min="1" max="30" value={anciennete}
+            <input type="range" min="1" max="30" defaultValue={anciennete}
               onInput={e => setAnciennete(parseInt((e.target as HTMLInputElement).value))}
-              onChange={e => { const v = parseInt(e.target.value); setAnciennete(v); }}
               style={{ width: '100%', accentColor: C.greenAccent, cursor: 'pointer' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textTertiary, marginTop: 4 }}>
               <span>1 an</span><span style={{ color: anciennete >= 5 ? C.greenAccent : C.amber }}>+5 ans = +3 pts bonus</span><span>30 ans</span>
