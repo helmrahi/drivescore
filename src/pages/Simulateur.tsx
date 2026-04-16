@@ -121,7 +121,8 @@ export default function Simulateur() {
             <div style={{ fontSize: 22, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>{km}<span style={{ fontSize: 12, color: C.textTertiary, fontFamily: C.fontSans, marginLeft: 4 }}>km/mois</span></div>
           </div>
           <input type="range" min="100" max="3000" step="50" value={km}
-            onChange={e => setKm(parseInt(e.target.value))}
+            onInput={e => setKm(parseInt((e.target as HTMLInputElement).value))}
+            onChange={e => { const v = parseInt(e.target.value); setKm(v); }}
             style={{ width: '100%', accentColor: C.greenAccent, cursor: 'pointer' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textTertiary, marginTop: 4 }}>
             <span>100 km</span><span>3 000 km</span>
@@ -172,12 +173,16 @@ export default function Simulateur() {
 
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, color: C.textPrimary, fontWeight: 500 }}>🪪 Ancienneté du permis</span>
+              <span style={{ fontSize: 13, color: C.textPrimary, fontWeight: 500 }}>🪪 Ancienneté du permis de conduire</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: anciennete >= 5 ? C.greenAccent : C.amber, fontFamily: C.fontMono }}>{anciennete} ans</span>
             </div>
             <input type="range" min="1" max="30" value={anciennete}
-              onChange={e => setAnciennete(parseInt(e.target.value))}
+              onInput={e => setAnciennete(parseInt((e.target as HTMLInputElement).value))}
+              onChange={e => { const v = parseInt(e.target.value); setAnciennete(v); }}
               style={{ width: '100%', accentColor: C.greenAccent, cursor: 'pointer' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.textTertiary, marginTop: 4 }}>
+              <span>1 an</span><span style={{ color: anciennete >= 5 ? C.greenAccent : C.amber }}>+5 ans = +3 pts bonus</span><span>30 ans</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: C.surface, borderRadius: 12 }}>
