@@ -35,6 +35,7 @@ export default function Leaderboard() {
 
   async function load() {
     setLoading(true)
+    try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
     const { data: myProfile } = await supabase.from('profiles').select('pseudo_id').eq('id', user.id).single()
@@ -72,7 +73,7 @@ export default function Leaderboard() {
     })).filter(d => d.trajets > 0)
 
     setDrivers(list)
-    setLoading(false)
+    } catch(e) { console.error(e) } finally { setLoading(false) }
   }
 
   const sorted = [...drivers].sort((a, b) => {
