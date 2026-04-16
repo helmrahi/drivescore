@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import { useAuth } from './hooks/useAuth'
+import React from 'react'
 import Login from './pages/Login'
 import Inscription from './pages/Inscription'
 import Dashboard from './pages/Dashboard'
