@@ -53,6 +53,30 @@ export default function Dashboard() {
   const { trajets, score, km, loading: dataLoading } = useDashboard(profile?.pseudo_id)
   const [leaderboardActif, setLeaderboardActif] = React.useState(false)
   const [uploading, setUploading] = React.useState(false)
+  const [showNPS, setShowNPS] = React.useState(false)
+
+  React.useEffect(() => {
+    async function checkNPS() {
+      if (!profile?.pseudo_id) return
+      // Déclencher NPS après 3ème trajet, max 1 fois par mois
+      if (trajets.length < 3) return
+      const lastNPS = localStorage.getItem('nps_last_' + profile.pseudo_id)
+      if (lastNPS) {
+        const diff = (Date.now() - parseInt(lastNPS)) / (1000*60*60*24)
+        if (diff < 30) return
+      }
+      // Vérifier si déjà répondu ce mois
+      const now = new Date()
+      const { data } = await (await import('../lib/supabase')).supabase
+        .from('nps_responses').select('id').eq('pseudo_id', profile.pseudo_id)
+        .gte('created_at', `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`)
+      if (!data?.length) {
+        setTimeout(() => setShowNPS(true), 3000)
+        localStorage.setItem('nps_last_' + profile.pseudo_id, Date.now().toString())
+      }
+    }
+    if (trajets.length >= 3) checkNPS()
+  }, [trajets.length, profile?.pseudo_id])
   const [expanded, setExpanded] = React.useState<string | null>(null)
   const [periode, setPeriode] = React.useState<'semaine' | 'mois' | 'tout'>('mois')
 
@@ -96,6 +120,12 @@ export default function Dashboard() {
       window.location.reload()
     } catch (e) { console.error(e) }
     setUploading(false)
+  }
+
+  if (showNPS) {
+    const { default: NPS } = require('../pages/NPS')
+    const reduction = score >= 90 ? 15 : score >= 80 ? 10 : score >= 70 ? 5 : 0
+    return <NPS pseudoId={profile?.pseudo_id||''} score={score} km={km} onClose={() => setShowNPS(false)} />
   }
 
   if (loading) return (

@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Trajets from './pages/Trajets'
 import Telematics from './pages/Telematics'
 import AuthCallback from './pages/AuthCallback'
+import NPS from './pages/NPS'
 import Admin from './pages/Admin'
 import ResetPassword from './pages/ResetPassword'
 import Simulateur from './pages/Simulateur'
@@ -37,6 +38,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function NPSWrapper() {
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const [score, setScore] = React.useState(0)
+  const [km, setKm] = React.useState(0)
+
+  React.useEffect(() => {
+    async function load() {
+      if (!profile?.pseudo_id) return
+      const now = new Date()
+      const { data } = await supabase.from('trajets').select('score_trajet,km').eq('pseudo_id', profile.pseudo_id).gte('date_trajet', `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`)
+      if (data?.length) {
+        const avg = Math.round(data.reduce((s,t) => s+(t.score_trajet||0),0)/data.length)
+        const totalKm = parseFloat(data.reduce((s,t) => s+(t.km||0),0).toFixed(1))
+        setScore(avg); setKm(totalKm)
+      }
+    }
+    load()
+  }, [profile])
+
+  return <NPS pseudoId={profile?.pseudo_id||''} score={score} km={km} onClose={() => navigate("/dashboard")} />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -48,6 +72,7 @@ export default function App() {
         <Route path="/trajets" element={<ProtectedRoute><Trajets /></ProtectedRoute>} />
         <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/nps" element={<ProtectedRoute><NPSWrapper /></ProtectedRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/simulateur" element={<Simulateur />} />
