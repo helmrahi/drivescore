@@ -118,7 +118,7 @@ export default function Simulateur() {
         <div style={{ background: C.white, borderRadius: 18, padding: '16px', marginBottom: 10, border: `1px solid ${C.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: C.textTertiary, fontWeight: 500, letterSpacing: '0.3px' }}>KILOMÉTRAGE MENSUEL</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>{km} <span style={{ fontSize: 12, color: C.textTertiary, fontFamily: C.fontSans }}>km</span></div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>{km}<span style={{ fontSize: 12, color: C.textTertiary, fontFamily: C.fontSans, marginLeft: 4 }}>km/mois</span></div>
           </div>
           <input type="range" min="100" max="3000" step="50" value={km}
             onChange={e => setKm(parseInt(e.target.value))}

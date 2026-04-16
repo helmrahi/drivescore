@@ -52,8 +52,7 @@ export default function Leaderboard() {
     const driverMap = new Map<string, any>()
     for (const t of filtered) {
       const p = profileMap.get(t.pseudo_id) as any
-      if (!p?.afficher_leaderboard) continue
-      if (!driverMap.has(t.pseudo_id)) {
+            if (!driverMap.has(t.pseudo_id)) {
         driverMap.set(t.pseudo_id, {
           pseudo_id: t.pseudo_id,
           prenom: p?.prenom || 'Conducteur',

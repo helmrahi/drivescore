@@ -21,7 +21,7 @@ export default function CommentCaMarche() {
       <div style={{ background: C.greenDeep, padding: '16px 20px 24px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, background: 'radial-gradient(circle, rgba(62,189,111,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>← Retour</button>
+          <button onClick={() => navigate('/dashboard')} style={{ background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.8)', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>← Retour</button>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>Comment ça marche ?</div>
         </div>
       </div>
@@ -123,7 +123,7 @@ export default function CommentCaMarche() {
           ))}
         </div>
 
-        <button onClick={() => navigate(-1)} style={{ width: '100%', padding: '15px', borderRadius: 14, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: C.fontSans }}>
+        <button onClick={() => navigate('/dashboard')} style={{ width: '100%', padding: '15px', borderRadius: 14, background: C.greenMid, color: 'white', border: 'none', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: C.fontSans }}>
           ✅ J'ai compris
         </button>
       </div>
