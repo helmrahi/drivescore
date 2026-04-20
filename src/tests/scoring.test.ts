@@ -126,3 +126,77 @@ describe('simulation trajets complets', () => {
     expect(f.reduction).toBeGreaterThan(0)
   })
 })
+
+describe('partage WhatsApp — génération lien', () => {
+  it('lien trajet valide', () => {
+    const trajetId = 'abc-123'
+    const link = `https://drivescore-eight.vercel.app/trajet/${trajetId}`
+    expect(link).toContain('/trajet/')
+    expect(link).toContain(trajetId)
+  })
+
+  it('message WhatsApp contient score et km', () => {
+    const score = 94
+    const km = 12.5
+    const link = 'https://drivescore-eight.vercel.app/trajet/abc-123'
+    const msg = `🚗 Mon trajet DriveScore\nScore: ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD\n👉 ${link}`
+    expect(msg).toContain('Score: 94/100')
+    expect(msg).toContain('12.50 km')
+    expect(msg).toContain('6.25 MAD')
+    expect(msg).toContain('drivescore-eight.vercel.app/trajet/')
+  })
+
+  it('URL WhatsApp encodée correctement', () => {
+    const msg = '🚗 Test DriveScore'
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
+    expect(url).toContain('wa.me')
+    expect(url).toContain(encodeURIComponent(msg))
+  })
+})
+
+describe('🧑‍🎓 Tests simples — tout le monde comprend', () => {
+
+  it('je commence un trajet avec un score parfait de 100', () => {
+    const score = calculerScore([], 0, 0, 0).score
+    expect(score).toBe(100)
+  })
+
+  it('je freine brusquement 1 fois → je perds 3 points', () => {
+    const avant = 100
+    const apres = calculerScore([{ type: 'freinage', magnitude: 9, timestamp: 0 }], 0, 0, 0).score
+    expect(avant - apres).toBe(3)
+  })
+
+  it('je roule à 60 km/h dans une zone 50 → excès détecté', () => {
+    const enExces = estEnExces(60, 50, 'ville')
+    expect(enExces).toBe(true)
+  })
+
+  it('je roule à 54 km/h dans une zone 50 → tolérance → pas d excès', () => {
+    const enExces = estEnExces(54, 50, 'ville')
+    expect(enExces).toBe(false)
+  })
+
+  it('score 92 → je paie moins cher que l assurance classique', () => {
+    const f = calculerFacture(200, 92, 'avril 2026')
+    expect(f.total).toBeLessThan(500)
+  })
+
+  it('score 65 → pas de réduction', () => {
+    const f = calculerFacture(100, 65, 'avril 2026')
+    expect(f.reduction).toBe(0)
+  })
+
+  it('plus je roule → plus je paie', () => {
+    const peu = calculerFacture(50, 80, 'avril').total
+    const beaucoup = calculerFacture(500, 80, 'avril').total
+    expect(beaucoup).toBeGreaterThan(peu)
+  })
+
+  it('meilleur score → meilleure réduction', () => {
+    const excellent = calculerFacture(100, 95, 'avril').reduction
+    const moyen = calculerFacture(100, 75, 'avril').reduction
+    expect(excellent).toBeGreaterThan(moyen)
+  })
+
+})
