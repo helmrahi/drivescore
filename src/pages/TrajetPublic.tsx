@@ -10,7 +10,7 @@ const C = {
   white: '#FFFFFF', surface: '#F7F8F6', surface2: '#EDEFEB',
   textPrimary: '#0D1F16', textSecondary: '#4A6355', textTertiary: '#8AA898',
   border: 'rgba(13,46,28,0.08)',
-  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace",
+  fontSans: "'DM Sans', sans-serif", fontMono: "'DM Mono', monospace", blue: '#2D7DD2',
 }
 
 function scColor(s: number) {
@@ -259,5 +259,3 @@ export default function TrajetPublic() {
     </div>
   )
 }
-
-const C_blue = '#2D7DD2'
