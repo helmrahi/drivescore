@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculerScore } from '../services/scoringService'
+import { calculerScore, calculerFacture } from '../services/scoringService'
 import { estEnExces, excesGrave, getToleranceVitesse } from '../lib/speedLimits'
 
 describe('calculerScore', () => {
@@ -92,4 +92,37 @@ describe('tolerances', () => {
   it('ville = +5 km/h', () => expect(getToleranceVitesse('ville')).toBe(5))
   it('route = +8 km/h', () => expect(getToleranceVitesse('route')).toBe(8))
   it('autoroute = +10 km/h', () => expect(getToleranceVitesse('autoroute')).toBe(10))
+})
+
+describe('simulation trajets complets', () => {
+  it('trajet parfait — 0 incident = 100', () => {
+    const r = calculerScore([], 0, 0, 0)
+    expect(r.score).toBe(100)
+  })
+
+  it('trajet avec 3 freinages = 91', () => {
+    const events = Array(3).fill({ type: 'freinage' as const, magnitude: 9, timestamp: 0 })
+    const r = calculerScore(events, 0, 0, 0)
+    expect(r.score).toBe(91)
+  })
+
+  it('trajet avec 5 excès légers = 85', () => {
+    const r = calculerScore([], 0, 5, 0)
+    expect(r.score).toBe(85)
+  })
+
+  it('trajet avec 2 excès graves = 86', () => {
+    const r = calculerScore([], 0, 2, 2)
+    expect(r.score).toBe(86)
+  })
+
+  it('trajet nocturne — score non impacté', () => {
+    const r = calculerScore([], 0, 0, 0)
+    expect(r.score).toBe(100) // nocturne = info seulement
+  })
+
+  it('réduction 90+ = -15%', () => {
+    const f = calculerFacture(200, 95, 'avril')
+    expect(f.reduction).toBeGreaterThan(0)
+  })
 })

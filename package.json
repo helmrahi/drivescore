@@ -11,7 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "test:all": "vitest run && playwright test",
+    "test:report": "vitest run --reporter=json --outputFile=public/test-results.json",
+    "test:ci": "vitest run --reporter=json --outputFile=public/test-results.json && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

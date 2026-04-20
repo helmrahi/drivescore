@@ -12,6 +12,7 @@ import AuthCallback from './pages/AuthCallback'
 import NPS from './pages/NPS'
 import TrajetPublic from './pages/TrajetPublic'
 import CompleteProfil from './pages/CompleteProfil'
+import Tests from './pages/Tests'
 import Admin from './pages/Admin'
 import ResetPassword from './pages/ResetPassword'
 import Simulateur from './pages/Simulateur'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/trajets" element={<ProtectedRoute><Trajets /></ProtectedRoute>} />
         <Route path="/telematics" element={<ProtectedRoute><Telematics /></ProtectedRoute>} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/tests" element={<Tests />} />
         <Route path="/complete-profil" element={<ProtectedRoute><CompleteProfil /></ProtectedRoute>} />
         <Route path="/trajet/:id" element={<TrajetPublic />} />
         <Route path="/nps" element={<ProtectedRoute><NPSWrapper /></ProtectedRoute>} />
