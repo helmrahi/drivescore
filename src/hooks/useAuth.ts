@@ -56,7 +56,14 @@ export function useAuth() {
       if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
         setUser(session.user)
         const p = await ensureProfile(session.user)
-        if (mounted) { setProfile(p); setLoading(false) }
+        if (mounted) {
+          setProfile(p)
+          setLoading(false)
+          // Rediriger si profil incomplet (OAuth sans prénom)
+          if (p && !p.prenom && event === 'SIGNED_IN') {
+            window.location.href = '/complete-profil'
+          }
+        }
       }
     })
 
