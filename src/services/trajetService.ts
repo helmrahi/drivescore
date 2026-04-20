@@ -7,7 +7,8 @@ import { supabase } from '../lib/supabase'
 import { Trajet } from '../types'
 
 function isValidKm(km: any): boolean {
-  return typeof km === 'number' && isFinite(km) && km > 0;
+  const n = parseFloat(km)
+  return !isNaN(n) && isFinite(n) && n >= 0.01;
 }
 
 export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]> {
