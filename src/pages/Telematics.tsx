@@ -48,6 +48,7 @@ export default function Telematics() {
 
   async function saveTrajetReal() {
     if (!profile?.pseudo_id) { if(setError) setError('Session expirée'); return }
+    if (km === 0) { resetTrajet(); navigate('/dashboard'); return }
 
     setPhase('saving')
     const pts = gpsPoints.current.filter((_,i)=>i%5===0).slice(0,150).map(p=>({
