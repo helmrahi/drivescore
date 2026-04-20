@@ -72,8 +72,11 @@ export default function Telematics() {
       if(setError) setError('Erreur: '+result.error)
       setPhase('stopped'); return
     }
+    const trajetId = result.id || ''
     setPhase('saved')
     setTimeout(()=>navigate('/dashboard'), 2000)
+    // Stocker l'id pour le partage WhatsApp
+    if (trajetId) sessionStorage.setItem('last_trajet_id', trajetId)
   }
 
   const [confirmShort, setConfirmShort] = React.useState(false)
