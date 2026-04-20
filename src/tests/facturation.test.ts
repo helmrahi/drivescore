@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculerFacture, getReduction } from '../services/scoringService'
+import { calculerFacture } from '../services/scoringService'
 
 describe('calculerFacture', () => {
   it('200 MAD base + 0.5/km', () => {
