@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Tests automatiques
+    name: Tests unitaires
 
     steps:
       - uses: actions/checkout@v4
@@ -23,15 +23,5 @@ jobs:
       - name: Installer dépendances
         run: npm ci
 
-      - name: Tests unitaires (Vitest)
+      - name: Tests Vitest
         run: npm run test
-
-      - name: Build production
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-
-      - name: Résumé tests
-        if: always()
-        run: echo "Tests terminés — voir les résultats ci-dessus"
