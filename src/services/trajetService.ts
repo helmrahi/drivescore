@@ -21,13 +21,13 @@ export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]
   return data || []
 }
 
-export async function insertTrajet(trajet: Omit<Trajet, 'id' | 'created_at'>): Promise<{ success: boolean; error?: string }> {
+export async function insertTrajet(trajet: Omit<Trajet, 'id' | 'created_at'>): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!isValidKm(trajet.km)) {
     return { success: false, id: '', error: "Le nombre de kilomètres doit être strictement positif." };
   }
-  const { error } = await supabase.from('trajets').insert(trajet)
-  if (error) return { success: false, id: '', error: error.message }
-  return { success: true, id: data?.[0]?.id || data?.id || '' }
+  const { data, error } = await supabase.from('trajets').insert(trajet).select('id').single()
+  if (error) return { success: false, error: error.message }
+  return { success: true, id: data?.id || '' }
 }
 
 export async function getTrajetStats(pseudoId: string): Promise<{
