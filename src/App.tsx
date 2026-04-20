@@ -19,6 +19,14 @@ import CommentCaMarche from './pages/CommentCaMarche'
 import Leaderboard from './pages/Leaderboard'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { profile, loading: authLoading } = useAuth()
+  // Redirect si profil incomplet
+  React.useEffect(() => {
+    if (!authLoading && profile && !profile.prenom && window.location.pathname !== '/complete-profil') {
+      window.location.href = '/complete-profil'
+    }
+  }, [profile, authLoading])
+
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
 
