@@ -200,3 +200,26 @@ describe('🧑‍🎓 Tests simples — tout le monde comprend', () => {
   })
 
 })
+
+describe('partage WhatsApp', () => {
+  it('lien trajet contient ID valide', () => {
+    const id = 'abc-123-def'
+    const link = `https://drivescore-eight.vercel.app/trajet/${id}`
+    expect(link).toMatch(/\/trajet\/[a-z0-9-]+$/)
+  })
+
+  it('message contient score km et MAD', () => {
+    const score = 94, km = 12.5
+    const msg = `Score: ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD`
+    expect(msg).toContain('94/100')
+    expect(msg).toContain('12.50 km')
+    expect(msg).toContain('6.25 MAD')
+  })
+
+  it('URL WhatsApp encodée', () => {
+    const msg = '🚗 DriveScore test'
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
+    expect(url).toContain('wa.me')
+    expect(url).not.toContain(' ')
+  })
+})

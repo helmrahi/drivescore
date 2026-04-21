@@ -12,7 +12,7 @@ export interface SpeedLimit {
 const cache = new Map<string, SpeedLimit>()
 
 function cacheKey(lat: number, lng: number): string {
-  return `${Math.round(lat * 1000) / 1000},${Math.round(lng * 1000) / 1000}`
+  return `${Math.round(lat * 500) / 500},${Math.round(lng * 500) / 500}`
 }
 
 // Limite par défaut si OSM échoue — ne pas baser sur vitesse actuelle
@@ -58,10 +58,10 @@ export async function getLimiteOSM(lat: number, lng: number): Promise<SpeedLimit
   const key = cacheKey(lat, lng)
   if (cache.has(key)) return cache.get(key)!
   try {
-    const query = `[out:json][timeout:3];way(around:20,${lat},${lng})["maxspeed"];out tags;`
+    const query = `[out:json][timeout:3];way(around:35,${lat},${lng})["maxspeed"];out tags;`
     const response = await fetch(
       `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`,
-      { signal: AbortSignal.timeout(3000) }
+      { signal: AbortSignal.timeout(5000) }
     )
     if (!response.ok) return null
     const data = await response.json()

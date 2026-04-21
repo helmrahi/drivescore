@@ -133,7 +133,8 @@ export function useTelematics() {
 
         if (currentSpeedKmh > 5) {
           try {
-            const limite = await getLimiteVitesse(point.lat, point.lng, currentSpeedKmh)
+            // Non-bloquant — OSM en arrière-plan
+            getLimiteVitesse(point.lat, point.lng, currentSpeedKmh).then(limite => {
             setLimiteActuelle(limite.limite)
             const typeRoute = detecterTypeRoute(currentSpeedKmh, limite.type_route)
             if (estEnExces(currentSpeedKmh, limite.limite, typeRoute)) {
@@ -148,6 +149,7 @@ export function useTelematics() {
             } else {
               setAlerteVitesse('')
             }
+            }).catch(() => {})
           } catch {}
         }
 

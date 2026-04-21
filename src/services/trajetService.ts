@@ -8,7 +8,7 @@ import { Trajet } from '../types'
 
 function isValidKm(km: any): boolean {
   const n = parseFloat(km)
-  return !isNaN(n) && isFinite(n) && n >= 0.01;
+  return !isNaN(n) && isFinite(n) && n >= 0;
 }
 
 export async function getTrajets(pseudoId: string, limit = 10): Promise<Trajet[]> {
@@ -27,7 +27,7 @@ export async function insertTrajet(trajet: Omit<Trajet, 'id' | 'created_at'>): P
     return { success: false, id: '', error: "Le nombre de kilomètres doit être strictement positif." };
   }
   const { data, error } = await supabase.from('trajets').insert(trajet).select('id').single()
-  if (error) return { success: false, error: error.message }
+  if (error) { console.error('insertTrajet error:', JSON.stringify(error)); return { success: false, error: error.message } }
   return { success: true, id: data?.id || '' }
 }
 

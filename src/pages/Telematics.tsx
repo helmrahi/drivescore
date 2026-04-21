@@ -47,8 +47,8 @@ export default function Telematics() {
   } = useTelematics()
 
   async function saveTrajetReal() {
-    if (!profile?.pseudo_id) { if(setError) setError('Session expirée'); return }
-    if (km === 0) { resetTrajet(); navigate('/dashboard'); return }
+    if (!profile?.pseudo_id) { if(setError) setError('Session expirée. Reconnectez-vous.'); navigate('/login'); return }
+    if (km < 0.01) { resetTrajet(); navigate('/dashboard'); return }
 
     setPhase('saving')
     const pts = gpsPoints.current.filter((_,i)=>i%5===0).slice(0,150).map(p=>({
@@ -72,11 +72,9 @@ export default function Telematics() {
       if(setError) setError('Erreur: '+result.error)
       setPhase('stopped'); return
     }
-    const trajetId = result.id || ''
     setPhase('saved')
+    if (result.id) sessionStorage.setItem('last_trajet_id', result.id)
     setTimeout(()=>navigate('/dashboard'), 2000)
-    // Stocker l'id pour le partage WhatsApp
-    if (trajetId) sessionStorage.setItem('last_trajet_id', trajetId)
   }
 
   const [confirmShort, setConfirmShort] = React.useState(false)
