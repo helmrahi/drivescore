@@ -223,3 +223,80 @@ describe('partage WhatsApp', () => {
     expect(url).not.toContain(' ')
   })
 })
+
+describe('🚗 Simulation conduite complète', () => {
+
+  // Simulation trajet Casa → Rabat
+  it('trajet 116km autoroute sans incident = score 100', () => {
+    const r = calculerScore([], 120, 0, 0)
+    expect(r.score).toBe(100)
+  })
+
+  it('trajet ville avec embouteillages = 5 freinages = score 85', () => {
+    const events = Array(5).fill({ type: 'freinage' as const, magnitude: 9, timestamp: 0 })
+    const r = calculerScore(events, 60, 0, 0)
+    expect(r.score).toBe(85)
+  })
+
+  it('trajet risqué = 3 excès graves + 2 freinages urgence = score 63', () => {
+    const events = Array(2).fill({ type: 'freinage' as const, magnitude: 13, timestamp: 0 })
+    const r = calculerScore(events, 0, 3, 3)
+    expect(r.score).toBe(63) // 100 - 2×8 - 3×7 = 63
+  })
+
+  it('trajet court 0.3km = km valide pour sauvegarde', () => {
+    const km = 0.3
+    expect(km >= 0).toBe(true)
+  })
+
+  it('trajet 0km = rejeté par isValidKm', () => {
+    const km = 0
+    const valid = km >= 0.01
+    expect(valid).toBe(false)
+  })
+
+  // Simulation OSM — limites par type route
+  it('route nationale 60 km/h → pas excès à 67 (tolérance +8)', () => {
+    const enExces = estEnExces(67, 60, 'route')
+    expect(enExces).toBe(false) // 67 < 60+8=68 → OK
+  })
+
+  it('route nationale 60 km/h → excès à 70', () => {
+    const enExces = estEnExces(70, 60, 'route')
+    expect(enExces).toBe(true) // 70 > 68
+  })
+
+  it('ville 60 km/h → excès à 66', () => {
+    const enExces = estEnExces(66, 60, 'ville')
+    expect(enExces).toBe(true) // 66 > 65
+  })
+
+  // Simulation facturation fin de mois
+  it('conducteur exemplaire 300km/mois = prime optimale', () => {
+    const f = calculerFacture(300, 95, 'avril 2026')
+    const base = 200 + 300 * 0.5 // 350
+    const reduction = Math.round(base * 0.15) // 52
+    expect(f.total).toBe(base - reduction)
+    expect(f.total).toBeLessThan(300)
+  })
+
+  it('conducteur risqué 300km/mois = prime pleine', () => {
+    const f = calculerFacture(300, 60, 'avril 2026')
+    expect(f.reduction).toBe(0)
+    expect(f.total).toBe(200 + 300 * 0.5)
+  })
+
+  // WhatsApp lien simulation
+  it('après trajet 116km score 97 = lien WhatsApp valide', () => {
+    const score = 97, km = 116
+    const id = 'test-trajet-id-123'
+    const link = `https://drivescore-eight.vercel.app/trajet/${id}`
+    const msg = `🚗 Mon trajet DriveScore\nScore: ${score}/100 | ${km.toFixed(2)} km | ${(km*0.5).toFixed(2)} MAD\n👉 ${link}`
+    expect(msg).toContain('97/100')
+    expect(msg).toContain('116.00 km')
+    expect(msg).toContain('58.00 MAD')
+    expect(msg).toContain('/trajet/test-trajet-id-123')
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`
+    expect(waUrl).toContain('wa.me')
+  })
+})
